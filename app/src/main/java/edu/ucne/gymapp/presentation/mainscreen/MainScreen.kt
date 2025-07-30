@@ -63,7 +63,7 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "¡Bienvenido a Gym App!",
+                text = "¡Bienvenido a RetroFit!",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = RetrofitColors.onSurface,

@@ -1,8 +1,7 @@
 package edu.ucne.gymapp.data.local.database
 
-import android.content.Context
+
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import edu.ucne.gymapp.data.local.dao.ExerciseDao
 import edu.ucne.gymapp.data.local.dao.ExerciseSetDao
@@ -35,7 +34,7 @@ import edu.ucne.gymapp.data.local.entities.WorkoutExercise
         WorkoutExercise::class,
         UserPreferences::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class GymDatabase : RoomDatabase(){
