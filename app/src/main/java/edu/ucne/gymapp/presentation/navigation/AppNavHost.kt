@@ -22,7 +22,6 @@ import edu.ucne.gymapp.presentation.routine.RoutineScreen
 import edu.ucne.gymapp.presentation.routine.RoutineViewModel
 import edu.ucne.gymapp.presentation.routinexercise.RoutineExerciseScreen
 import edu.ucne.gymapp.presentation.routinexercise.RoutineExerciseViewModel
-import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesEvent
 import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesScreen
 import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesViewModel
 import edu.ucne.gymapp.presentation.users.LoginScreen

@@ -1,11 +1,8 @@
 package edu.ucne.gymapp.presentation.users
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.entities.User
