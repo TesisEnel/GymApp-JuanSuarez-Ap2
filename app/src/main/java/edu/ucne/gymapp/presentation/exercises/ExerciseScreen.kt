@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -68,14 +67,43 @@ fun ExerciseScreen(
     state: ExerciseUiState,
     onEvent: (ExerciseEvent) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToExerciseSet: () -> Unit
+    onNavigateToExerciseSet: () -> Unit,
+    viewModel: ExerciseViewModel,
+    muscleGroupId: Int? = null
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        onEvent(ExerciseEvent.LoadAllExercises)
+
+    LaunchedEffect(state.isCreated) {
+        if (state.isCreated) {
+            showCreateDialog = false
+            onEvent(ExerciseEvent.ClearMessages)
+
+        }
+    }
+
+    LaunchedEffect(state.isUpdated) {
+        if (state.isUpdated) {
+            showEditDialog = false
+            onEvent(ExerciseEvent.ClearMessages)
+        }
+    }
+
+    LaunchedEffect(state.isDeleted) {
+        if (state.isDeleted) {
+            showDeleteDialog = false
+            onEvent(ExerciseEvent.ClearMessages)
+        }
+    }
+
+    LaunchedEffect(muscleGroupId) {
+        if (muscleGroupId != null) {
+            onEvent(ExerciseEvent.LoadExercisesByMuscleGroup(muscleGroupId))
+        } else {
+            onEvent(ExerciseEvent.LoadAllExercises)
+        }
     }
 
     Box(
@@ -126,9 +154,11 @@ fun ExerciseScreen(
                 )
 
                 Button(
-                    onClick = { showCreateDialog = true },
-                    modifier = Modifier
-                        .height(48.dp),
+                    onClick = {
+                        onEvent(ExerciseEvent.ClearMessages)
+                        showCreateDialog = true
+                    },
+                    modifier = Modifier.height(48.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RetrofitColors.Primary
                     ),
@@ -156,7 +186,13 @@ fun ExerciseScreen(
                 item {
                     FilterChip(
                         selected = false,
-                        onClick = { onEvent(ExerciseEvent.LoadExercisesByPopularity) },
+                        onClick = {
+                            if (muscleGroupId != null) {
+                                onEvent(ExerciseEvent.LoadExercisesByMuscleGroup(muscleGroupId))
+                            } else {
+                                onEvent(ExerciseEvent.LoadExercisesByPopularity)
+                            }
+                        },
                         label = {
                             Text(
                                 text = "Populares",
@@ -172,7 +208,17 @@ fun ExerciseScreen(
                 item {
                     FilterChip(
                         selected = false,
-                        onClick = { onEvent(ExerciseEvent.LoadExercisesByDifficulty("Principiante")) },
+                        onClick = {
+                            if (muscleGroupId != null) {
+                                // Filtrar principiantes SOLO del grupo muscular específico
+                                onEvent(ExerciseEvent.LoadExercisesByMuscleGroupsAndDifficulties(
+                                    listOf(muscleGroupId),
+                                    listOf("Principiante")
+                                ))
+                            } else {
+                                onEvent(ExerciseEvent.LoadExercisesByDifficulty("Principiante"))
+                            }
+                        },
                         label = {
                             Text(
                                 text = "Principiante",
@@ -188,7 +234,17 @@ fun ExerciseScreen(
                 item {
                     FilterChip(
                         selected = false,
-                        onClick = { onEvent(ExerciseEvent.LoadExercisesByDifficulty("Intermedio")) },
+                        onClick = {
+                            if (muscleGroupId != null) {
+                                // Filtrar intermedios SOLO del grupo muscular específico
+                                onEvent(ExerciseEvent.LoadExercisesByMuscleGroupsAndDifficulties(
+                                    listOf(muscleGroupId),
+                                    listOf("Intermedio")
+                                ))
+                            } else {
+                                onEvent(ExerciseEvent.LoadExercisesByDifficulty("Intermedio"))
+                            }
+                        },
                         label = {
                             Text(
                                 text = "Intermedio",
@@ -204,10 +260,42 @@ fun ExerciseScreen(
                 item {
                     FilterChip(
                         selected = false,
-                        onClick = { onEvent(ExerciseEvent.LoadExercisesByDifficulty("Avanzado")) },
+                        onClick = {
+                            if (muscleGroupId != null) {
+                                // Filtrar avanzados SOLO del grupo muscular específico
+                                onEvent(ExerciseEvent.LoadExercisesByMuscleGroupsAndDifficulties(
+                                    listOf(muscleGroupId),
+                                    listOf("Avanzado")
+                                ))
+                            } else {
+                                onEvent(ExerciseEvent.LoadExercisesByDifficulty("Avanzado"))
+                            }
+                        },
                         label = {
                             Text(
                                 text = "Avanzado",
+                                color = RetrofitColors.onSurface
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = RetrofitColors.Surface,
+                            selectedContainerColor = RetrofitColors.Primary
+                        )
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            if (muscleGroupId != null) {
+                                onEvent(ExerciseEvent.LoadExercisesByMuscleGroup(muscleGroupId))
+                            } else {
+                                onEvent(ExerciseEvent.LoadAllExercises)
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = "Todos",
                                 color = RetrofitColors.onSurface
                             )
                         },
@@ -230,20 +318,25 @@ fun ExerciseScreen(
                     )
                 }
             } else {
-                LazyColumn (
+                LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(state.filteredExercises) { exercise ->
                         ExerciseCard(
                             exercise = exercise,
+                            canEditOrDelete = viewModel.canEditOrDeleteExercise(exercise),
                             onEdit = {
-                                onEvent(ExerciseEvent.LoadExerciseById(exercise.exerciseId))
-                                showEditDialog = true
+                                if (viewModel.canEditOrDeleteExercise(exercise)) {
+                                    onEvent(ExerciseEvent.LoadExerciseById(exercise.exerciseId))
+                                    showEditDialog = true
+                                }
                             },
                             onDelete = {
-                                onEvent(ExerciseEvent.LoadExerciseById(exercise.exerciseId))
-                                showDeleteDialog = true
+                                if (viewModel.canEditOrDeleteExercise(exercise)) {
+                                    onEvent(ExerciseEvent.LoadExerciseById(exercise.exerciseId))
+                                    showDeleteDialog = true
+                                }
                             },
                             onClick = {
                                 onEvent(ExerciseEvent.IncrementPopularity(exercise.exerciseId))
@@ -336,7 +429,10 @@ fun ExerciseScreen(
         CreateExerciseDialog(
             state = state,
             onEvent = onEvent,
-            onDismiss = { showCreateDialog = false }
+            onDismiss = {
+                showCreateDialog = false
+                onEvent(ExerciseEvent.ClearMessages)
+            }
         )
     }
 
@@ -344,7 +440,10 @@ fun ExerciseScreen(
         EditExerciseDialog(
             state = state,
             onEvent = onEvent,
-            onDismiss = { showEditDialog = false }
+            onDismiss = {
+                showEditDialog = false
+                onEvent(ExerciseEvent.ClearMessages)
+            }
         )
     }
 
@@ -355,7 +454,10 @@ fun ExerciseScreen(
                 onEvent(ExerciseEvent.DeleteExercise)
                 showDeleteDialog = false
             },
-            onDismiss = { showDeleteDialog = false }
+            onDismiss = {
+                showDeleteDialog = false
+                onEvent(ExerciseEvent.ClearMessages)
+            }
         )
     }
 }
@@ -365,7 +467,8 @@ fun ExerciseCard(
     exercise: Exercise,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    canEditOrDelete: Boolean = true
 ) {
     Card(
         modifier = Modifier
@@ -388,12 +491,36 @@ fun ExerciseCard(
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = exercise.name,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RetrofitColors.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = exercise.name,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RetrofitColors.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Mostrar indicador para ejercicios predefinidos
+                        if (!canEditOrDelete) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = RetrofitColors.Primary.copy(alpha = 0.1f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "Sistema",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = RetrofitColors.Primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
                     Text(
                         text = exercise.description,
                         fontSize = 14.sp,
@@ -404,28 +531,30 @@ fun ExerciseCard(
                     )
                 }
 
-                Row {
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Editar",
-                            tint = RetrofitColors.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar",
-                            tint = RetrofitColors.Primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                if (canEditOrDelete) {
+                    Row {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Editar",
+                                tint = Color.DarkGray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Eliminar",
+                                tint = Color.Red,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -502,7 +631,6 @@ fun ExerciseCard(
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateExerciseDialog(
@@ -692,7 +820,6 @@ fun CreateExerciseDialog(
                         Button(
                             onClick = {
                                 onEvent(ExerciseEvent.CreateExercise)
-                                onDismiss()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
@@ -715,7 +842,6 @@ fun CreateExerciseDialog(
         }
     }
 }
-
 @Composable
 fun DeleteExerciseDialog(
     exercise: Exercise?,
@@ -741,7 +867,7 @@ fun DeleteExerciseDialog(
                 Button(
                     onClick = onConfirm,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RetrofitColors.Primary
+                        containerColor = Color.Red
                     )
                 ) {
                     Text("Eliminar", color = Color.White)
@@ -947,7 +1073,6 @@ fun EditExerciseDialog(
                         Button(
                             onClick = {
                                 onEvent(ExerciseEvent.UpdateExercise)
-                                onDismiss()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
