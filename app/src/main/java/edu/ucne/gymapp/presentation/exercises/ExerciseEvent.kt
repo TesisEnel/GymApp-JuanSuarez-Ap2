@@ -1,5 +1,7 @@
 package edu.ucne.gymapp.presentation.exercises
 
+import edu.ucne.gymapp.data.local.entities.Exercise
+
 sealed interface ExerciseEvent {
     data class NameChange(val name: String) : ExerciseEvent
     data class DescriptionChange(val description: String) : ExerciseEvent
@@ -23,6 +25,8 @@ sealed interface ExerciseEvent {
     data class IncrementPopularity(val exerciseId: Int) : ExerciseEvent
     data class FilterByDifficulties(val difficulties: List<String>) : ExerciseEvent
     data class FilterByMuscleGroups(val muscleGroupIds: List<Int>) : ExerciseEvent
+    data class CheckCanEditOrDelete(val exercise: Exercise?) : ExerciseEvent
+    data class InsertPredefinedExercises(val exercises: List<Exercise>) : ExerciseEvent
     data object LoadExercisesByPopularity : ExerciseEvent
     data object CreateExercise : ExerciseEvent
     data object UpdateExercise : ExerciseEvent
