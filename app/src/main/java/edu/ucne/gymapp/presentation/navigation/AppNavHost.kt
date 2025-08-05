@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import edu.ucne.gymapp.presentation.users.UserViewModel
 import androidx.compose.runtime.getValue
+import androidx.navigation.toRoute
 import edu.ucne.gymapp.presentation.exercises.ExerciseScreen
 import edu.ucne.gymapp.presentation.exercises.ExerciseViewModel
 import edu.ucne.gymapp.presentation.exercisesets.ExerciseSetScreen
@@ -103,9 +104,7 @@ fun AppNavHost(
 
         composable<Screen.Main> {
             MainScreen(
-                onNavigateToExercise = {
-                    navController.navigate(Screen.Exercise)
-                },
+
                 onNavigateToRoutine = {
                     navController.navigate(Screen.Routine)
                 },
@@ -117,11 +116,15 @@ fun AppNavHost(
                 },
                 onNavigateToUserPreferences = {
                     navController.navigate(Screen.UserPreferences)
-                }
+                },
+                onNavigateToExercise = {
+                    navController.navigate(Screen.Exercise())
+                },
             )
         }
 
-        composable<Screen.Exercise> {
+        composable<Screen.Exercise> { backStackEntry ->
+            val args = backStackEntry.toRoute<Screen.Exercise>()
             ExerciseScreen(
                 state = exerciseState,
                 onEvent = exerciseViewModel::onEvent,
@@ -130,7 +133,9 @@ fun AppNavHost(
                 },
                 onNavigateToExerciseSet = {
                     navController.navigate(Screen.ExerciseSet)
-                }
+                },
+                viewModel = exerciseViewModel,
+                muscleGroupId = args.muscleGroupId
             )
         }
 
@@ -151,8 +156,8 @@ fun AppNavHost(
                 onNavigateBack = {
                     navController.navigateUp()
                 },
-                onNavigateToExercise = {
-                    navController.navigate(Screen.Exercise)
+                onNavigateToExercise = { muscleGroup ->
+                    navController.navigate(Screen.Exercise(muscleGroupId = muscleGroup.muscleGroupId))
                 }
             )
         }

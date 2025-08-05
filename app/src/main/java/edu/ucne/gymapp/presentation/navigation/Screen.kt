@@ -13,7 +13,7 @@ sealed class Screen{
     data object Main: Screen()
 
     @Serializable
-    data object Exercise: Screen()
+    data class Exercise(val muscleGroupId: Int? = null) : Screen()
 
     @Serializable
     data object ExerciseSet: Screen()
