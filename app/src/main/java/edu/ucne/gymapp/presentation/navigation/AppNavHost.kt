@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import edu.ucne.gymapp.presentation.users.UserViewModel
 import androidx.compose.runtime.getValue
+import androidx.navigation.toRoute
 import edu.ucne.gymapp.presentation.exercises.ExerciseScreen
 import edu.ucne.gymapp.presentation.exercises.ExerciseViewModel
 import edu.ucne.gymapp.presentation.exercisesets.ExerciseSetScreen
@@ -26,8 +27,6 @@ import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesScreen
 import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesViewModel
 import edu.ucne.gymapp.presentation.users.LoginScreen
 import edu.ucne.gymapp.presentation.users.RegisterScreen
-import edu.ucne.gymapp.presentation.workoutexercises.WorkoutExerciseScreen
-import edu.ucne.gymapp.presentation.workoutexercises.WorkoutExerciseViewModel
 import edu.ucne.gymapp.presentation.workouts.WorkoutScreen
 import edu.ucne.gymapp.presentation.workouts.WorkoutViewModel
 
@@ -57,8 +56,7 @@ fun AppNavHost(
     val workoutViewModel: WorkoutViewModel = hiltViewModel()
     val workoutState by workoutViewModel.state.collectAsState()
 
-    val workoutExerciseViewModel: WorkoutExerciseViewModel = hiltViewModel()
-    val workoutExerciseState by workoutExerciseViewModel.state.collectAsState()
+
 
     val userPreferencesViewModel: UserPreferencesViewModel = hiltViewModel()
     val userPreferencesState by userPreferencesViewModel.state.collectAsState()
@@ -103,9 +101,7 @@ fun AppNavHost(
 
         composable<Screen.Main> {
             MainScreen(
-                onNavigateToExercise = {
-                    navController.navigate(Screen.Exercise)
-                },
+
                 onNavigateToRoutine = {
                     navController.navigate(Screen.Routine)
                 },
@@ -117,11 +113,15 @@ fun AppNavHost(
                 },
                 onNavigateToUserPreferences = {
                     navController.navigate(Screen.UserPreferences)
-                }
+                },
+                onNavigateToExercise = {
+                    navController.navigate(Screen.Exercise())
+                },
             )
         }
 
-        composable<Screen.Exercise> {
+        composable<Screen.Exercise> { backStackEntry ->
+            val args = backStackEntry.toRoute<Screen.Exercise>()
             ExerciseScreen(
                 state = exerciseState,
                 onEvent = exerciseViewModel::onEvent,
@@ -130,7 +130,9 @@ fun AppNavHost(
                 },
                 onNavigateToExerciseSet = {
                     navController.navigate(Screen.ExerciseSet)
-                }
+                },
+                viewModel = exerciseViewModel,
+                muscleGroupId = args.muscleGroupId
             )
         }
 
@@ -151,8 +153,8 @@ fun AppNavHost(
                 onNavigateBack = {
                     navController.navigateUp()
                 },
-                onNavigateToExercise = {
-                    navController.navigate(Screen.Exercise)
+                onNavigateToExercise = { muscleGroup ->
+                    navController.navigate(Screen.Exercise(muscleGroupId = muscleGroup.muscleGroupId))
                 }
             )
         }
@@ -189,22 +191,6 @@ fun AppNavHost(
                 onEvent = workoutViewModel::onEvent,
                 onNavigateBack = {
                     navController.navigateUp()
-                },
-                onNavigateToWorkoutExercise = {
-                    navController.navigate(Screen.WorkoutExercise)
-                }
-            )
-        }
-
-        composable<Screen.WorkoutExercise> {
-            WorkoutExerciseScreen(
-                state = workoutExerciseState,
-                onEvent = workoutExerciseViewModel::onEvent,
-                onNavigateBack = {
-                    navController.navigateUp()
-                },
-                onNavigateToExerciseSet = {
-                    navController.navigate(Screen.ExerciseSet)
                 }
             )
         }
@@ -216,12 +202,7 @@ fun AppNavHost(
                 onNavigateBack = {
                     navController.navigateUp()
                 },
-                /*onLogout = {
-                    userPreferencesViewModel.onEvent(UserPreferencesEvent.Logout)
-                    navController.navigate(Screen.Login) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }*/
+
             )
         }
     }

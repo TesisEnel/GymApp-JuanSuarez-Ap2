@@ -34,7 +34,7 @@ import edu.ucne.gymapp.data.local.entities.WorkoutExercise
         WorkoutExercise::class,
         UserPreferences::class
     ],
-    version = 13,
+    version = 16,
     exportSchema = false
 )
 abstract class GymDatabase : RoomDatabase(){

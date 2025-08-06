@@ -135,6 +135,7 @@ object PredefinedMuscleGroups {
             description = "Erectores espinales y cuadrado lumbar",
             iconResource = LOWER_BACK_ICON
         )
+
     )
 
     fun getAllMuscleGroups(): List<MuscleGroup> {
@@ -142,12 +143,17 @@ object PredefinedMuscleGroups {
     }
 
     fun getMainMuscleGroups(): List<MuscleGroup> {
-        return muscleGroups
+        return muscleGroups.take(7)
+    }
+
+    fun getSpecificMuscleGroups(): List<MuscleGroup> {
+        return muscleGroups.drop(7)
     }
 
     fun getBackSubGroups(): List<MuscleGroup> {
         return backSubGroups
     }
+
 }
 
 suspend fun GymDatabase.initializePredefinedMuscleGroups() {

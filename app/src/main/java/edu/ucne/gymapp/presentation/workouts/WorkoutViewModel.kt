@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.entities.Workout
+import edu.ucne.gymapp.data.local.entities.Routine
 import edu.ucne.gymapp.data.repository.WorkoutRepository
+import edu.ucne.gymapp.data.repository.RoutineRepository
+import edu.ucne.gymapp.data.repository.RoutineExerciseRepository
+import edu.ucne.gymapp.data.repository.ExerciseRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -14,118 +18,130 @@ import javax.inject.Inject
 
 @HiltViewModel
 class WorkoutViewModel @Inject constructor(
-    private val workoutRepository: WorkoutRepository
+    private val workoutRepository: WorkoutRepository,
+    private val routineRepository: RoutineRepository,
+    private val routineExerciseRepository: RoutineExerciseRepository,
+    private val exerciseRepository: ExerciseRepository
 ) : ViewModel() {
+
     private val _state = MutableStateFlow(WorkoutUiState())
     val state = _state.asStateFlow()
 
-    private fun createWorkout() {
+    init {
+        loadInitialData()
+    }
+
+    private fun loadInitialData() {
         viewModelScope.launch {
-            val currentState = _state.value
+            loadRecentWorkouts()
+            loadAvailableRoutines()
+        }
+    }
 
-            if (currentState.name.isBlank()) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "El nombre del entrenamiento no puede estar vacío"
-                    )
-                }
-                return@launch
-            }
+    private fun navigateToScreen(screen: WorkoutScreen) {
+        _state.update { it.copy(currentScreen = screen) }
+    }
 
-            if (currentState.userId <= 0) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "Usuario inválido"
-                    )
-                }
-                return@launch
-            }
-
-            val workout = Workout(
-                userId = currentState.userId,
-                routineId = if (currentState.routineId > 0) currentState.routineId else null,
-                name = currentState.name.trim(),
-                startTime = currentState.startTime,
-                endTime = currentState.endTime,
-                totalDuration = currentState.totalDuration,
-                status = currentState.status,
-                notes = currentState.notes?.trim()
+    private fun showRoutineSelector() {
+        _state.update {
+            it.copy(
+                currentScreen = WorkoutScreen.ROUTINE_SELECTOR,
+                showRoutineSelector = true
             )
-
-            workoutRepository.insertWorkout(workout).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                isCreated = true,
-                                successMessage = "Entrenamiento creado exitosamente",
-                                errorMessage = null
-                            )
-                        }
-                        loadWorkoutsByUser(currentState.userId)
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error desconocido al crear entrenamiento",
-                                successMessage = null
-                            )
-                        }
-                    }
-                }
-            }
         }
+        loadAvailableRoutines()
     }
 
-    private fun updateWorkout() {
-        viewModelScope.launch {
-            val currentState = _state.value
-            val selectedWorkout = currentState.selectedWorkout
-
-            if (selectedWorkout == null) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "No hay entrenamiento seleccionado para actualizar"
-                    )
-                }
-                return@launch
-            }
-
-            if (currentState.name.isBlank()) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "El nombre del entrenamiento no puede estar vacío"
-                    )
-                }
-                return@launch
-            }
-
-            val updatedWorkout = selectedWorkout.copy(
-                name = currentState.name.trim(),
-                startTime = currentState.startTime,
-                endTime = currentState.endTime,
-                totalDuration = currentState.totalDuration,
-                status = currentState.status,
-                notes = currentState.notes?.trim()
+    private fun backToDashboard() {
+        _state.update {
+            it.copy(
+                currentScreen = WorkoutScreen.DASHBOARD,
+                showRoutineSelector = false,
+                showQuickStart = false
             )
+        }
+    }
 
-            workoutRepository.updateWorkout(updatedWorkout).collect { result ->
+    private fun loadAvailableRoutines() {
+        viewModelScope.launch {
+            routineRepository.getRoutines().collect { result ->
                 when (result) {
+                    is Resource.Error -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = result.message ?: "Error al cargar rutinas"
+                            )
+                        }
+                    }
+                    is Resource.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
+                    }
+                    is Resource.Success -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                availableRoutines = result.data ?: emptyList(),
+                                errorMessage = null
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun selectRoutine(routine: Routine) {
+        _state.update {
+            it.copy(selectedRoutine = routine)
+        }
+        loadRoutineExercises(routine.routineId)
+    }
+
+    private fun loadRoutineExercises(routineId: Int) {
+        viewModelScope.launch {
+            routineExerciseRepository.getRoutineExercises(routineId).collect { routineExerciseResult ->
+                when (routineExerciseResult) {
+                    is Resource.Success -> {
+                        val routineExercises = routineExerciseResult.data ?: emptyList()
+                        _state.update { it.copy(routineExercises = routineExercises) }
+
+                        if (routineExercises.isNotEmpty()) {
+                            val exerciseIds = routineExercises.map { it.exerciseId }
+                            exerciseRepository.getExercisesByIds(exerciseIds).collect { exerciseResult ->
+                                when (exerciseResult) {
+                                    is Resource.Success -> {
+                                        val exercises = exerciseResult.data ?: emptyList()
+                                        _state.update {
+                                            it.copy(
+                                                exercises = exercises,
+                                                errorMessage = null
+                                            )
+                                        }
+                                    }
+                                    is Resource.Error -> {
+                                        _state.update {
+                                            it.copy(errorMessage = "Error al cargar ejercicios")
+                                        }
+                                    }
+                                    is Resource.Loading -> {
+                                        _state.update {
+                                            it.copy(
+                                                isLoading = true,
+                                                errorMessage = null,
+                                                successMessage = null
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    is Resource.Error -> {
+                        _state.update {
+                            it.copy(errorMessage = "Error al cargar ejercicios de la rutina")
+                        }
+                    }
                     is Resource.Loading -> {
                         _state.update {
                             it.copy(
@@ -135,274 +151,17 @@ class WorkoutViewModel @Inject constructor(
                             )
                         }
                     }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                isUpdated = true,
-                                selectedWorkout = updatedWorkout,
-                                successMessage = "Entrenamiento actualizado exitosamente",
-                                errorMessage = null
-                            )
-                        }
-                        loadWorkoutsByUser(currentState.userId)
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error desconocido al actualizar entrenamiento",
-                                successMessage = null
-                            )
-                        }
-                    }
                 }
             }
         }
     }
 
-    private fun deleteWorkout() {
+    private fun startWorkoutWithRoutine(routine: Routine) {
         viewModelScope.launch {
-            val currentState = _state.value
-            val selectedWorkout = currentState.selectedWorkout
-
-            if (selectedWorkout == null) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "No hay entrenamiento seleccionado para eliminar"
-                    )
-                }
-                return@launch
-            }
-
-            workoutRepository.deleteWorkout(selectedWorkout).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                isDeleted = true,
-                                selectedWorkout = null,
-                                successMessage = "Entrenamiento eliminado exitosamente",
-                                errorMessage = null
-                            )
-                        }
-                        loadWorkoutsByUser(currentState.userId)
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error desconocido al eliminar entrenamiento",
-                                successMessage = null
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun loadWorkoutById(id: Int) {
-        viewModelScope.launch {
-            workoutRepository.getWorkoutById(id).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                selectedWorkout = result.data,
-                                errorMessage = null
-                            )
-                        }
-                        result.data?.let { workout ->
-                            populateStateFromWorkout(workout)
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar entrenamiento",
-                                selectedWorkout = null
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun loadWorkoutsByUser(userId: Int) {
-        viewModelScope.launch {
-            workoutRepository.getWorkoutsByUser(userId).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                workouts = result.data ?: emptyList(),
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar entrenamientos",
-                                workouts = emptyList()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun loadWorkoutsByRoutine(routineId: Int) {
-        viewModelScope.launch {
-            workoutRepository.getWorkoutsByRoutine(routineId).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                filteredWorkouts = result.data ?: emptyList(),
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar entrenamientos por rutina",
-                                filteredWorkouts = emptyList()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun loadWorkoutsByStatus(userId: Int, status: String) {
-        viewModelScope.launch {
-            workoutRepository.getWorkoutsByStatus(userId, status).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                filteredWorkouts = result.data ?: emptyList(),
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar entrenamientos por estado",
-                                filteredWorkouts = emptyList()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun loadActiveWorkout(userId: Int) {
-        viewModelScope.launch {
-            workoutRepository.getActiveWorkout(userId).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        val activeWorkout = result.data
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                currentWorkout = activeWorkout,
-                                isWorkoutActive = activeWorkout != null,
-                                isPaused = activeWorkout?.status == "PAUSED",
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar entrenamiento activo",
-                                currentWorkout = null,
-                                isWorkoutActive = false
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun startWorkout(routineId: Int) {
-        viewModelScope.launch {
-            val currentState = _state.value
-
             val workout = Workout(
-                userId = currentState.userId,
-                routineId = routineId,
-                name = "Entrenamiento ${System.currentTimeMillis()}",
+                userId = _state.value.userId,
+                routineId = routine.routineId,
+                name = routine.name,
                 startTime = System.currentTimeMillis(),
                 endTime = null,
                 totalDuration = 0,
@@ -413,111 +172,31 @@ class WorkoutViewModel @Inject constructor(
             workoutRepository.insertWorkout(workout).collect { result ->
                 when (result) {
                     is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
+                        _state.update { it.copy(isLoading = true) }
                     }
                     is Resource.Success -> {
                         _state.update {
                             it.copy(
                                 isLoading = false,
-                                workoutStarted = true,
+                                currentWorkout = workout,
+                                selectedRoutine = routine,
                                 isWorkoutActive = true,
-                                status = "IN_PROGRESS",
+                                currentScreen = WorkoutScreen.ACTIVE_WORKOUT,
                                 startTime = workout.startTime,
-                                successMessage = "Entrenamiento iniciado",
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al iniciar entrenamiento",
-                                successMessage = null
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun pauseWorkout(workoutId: Int) {
-        viewModelScope.launch {
-            workoutRepository.pauseWorkout(workoutId).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                workoutPaused = true,
-                                isPaused = true,
-                                status = "PAUSED",
-                                successMessage = "Entrenamiento pausado",
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al pausar entrenamiento",
-                                successMessage = null
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun resumeWorkout(workoutId: Int) {
-        viewModelScope.launch {
-            workoutRepository.resumeWorkout(workoutId).collect { result ->
-                when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                workoutResumed = true,
+                                workoutTimer = 0,
+                                currentExerciseIndex = 0,
+                                currentSet = 1,
                                 isPaused = false,
-                                status = "IN_PROGRESS",
-                                successMessage = "Entrenamiento reanudado",
-                                errorMessage = null
+                                successMessage = "¡Entrenamiento iniciado!"
                             )
                         }
+                        loadRoutineExercises(routine.routineId)
                     }
                     is Resource.Error -> {
                         _state.update {
                             it.copy(
                                 isLoading = false,
-                                errorMessage = result.message ?: "Error al reanudar entrenamiento",
-                                successMessage = null
+                                errorMessage = result.message ?: "Error al iniciar entrenamiento"
                             )
                         }
                     }
@@ -526,209 +205,405 @@ class WorkoutViewModel @Inject constructor(
         }
     }
 
-    private fun finishWorkout(workoutId: Int) {
+    private fun startQuickWorkout() {
         viewModelScope.launch {
-            val currentTime = System.currentTimeMillis()
-            val duration = ((currentTime - _state.value.startTime) / 1000).toInt()
+            val workout = Workout(
+                userId = _state.value.userId,
+                routineId = null,
+                name = "Entrenamiento Libre - ${System.currentTimeMillis()}",
+                startTime = System.currentTimeMillis(),
+                endTime = null,
+                totalDuration = 0,
+                status = "IN_PROGRESS",
+                notes = null
+            )
 
-            workoutRepository.finishWorkout(workoutId, "COMPLETED", currentTime, duration).collect { result ->
+            workoutRepository.insertWorkout(workout).collect { result ->
                 when (result) {
-                    is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
                     is Resource.Success -> {
                         _state.update {
                             it.copy(
-                                isLoading = false,
-                                workoutFinished = true,
-                                isWorkoutActive = false,
+                                currentWorkout = workout,
+                                selectedRoutine = null,
+                                isWorkoutActive = true,
+                                currentScreen = WorkoutScreen.ACTIVE_WORKOUT,
+                                startTime = workout.startTime,
+                                workoutTimer = 0,
                                 isPaused = false,
-                                status = "COMPLETED",
-                                endTime = currentTime,
-                                totalDuration = duration,
-                                successMessage = "¡Entrenamiento completado!",
-                                errorMessage = null
+                                successMessage = "¡Entrenamiento libre iniciado!"
                             )
                         }
                     }
                     is Resource.Error -> {
                         _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al finalizar entrenamiento",
-                                successMessage = null
-                            )
+                            it.copy(errorMessage = "Error al iniciar entrenamiento libre")
                         }
                     }
-                }
-            }
-        }
-    }
-
-    private fun cancelWorkout(workoutId: Int) {
-        viewModelScope.launch {
-            val currentTime = System.currentTimeMillis()
-            val duration = ((currentTime - _state.value.startTime) / 1000).toInt()
-
-            workoutRepository.finishWorkout(workoutId, "CANCELLED", currentTime, duration).collect { result ->
-                when (result) {
                     is Resource.Loading -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = true,
-                                errorMessage = null,
-                                successMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Success -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                workoutCancelled = true,
-                                isWorkoutActive = false,
-                                isPaused = false,
-                                status = "CANCELLED",
-                                endTime = currentTime,
-                                totalDuration = duration,
-                                successMessage = "Entrenamiento cancelado",
-                                errorMessage = null
-                            )
-                        }
-                    }
-                    is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = result.message ?: "Error al cancelar entrenamiento",
-                                successMessage = null
-                            )
-                        }
+                        _state.update { it.copy(isLoading = true) }
                     }
                 }
             }
         }
     }
 
-    private fun populateStateFromWorkout(workout: Workout) {
+    private fun pauseWorkout() {
         _state.update {
             it.copy(
-                userId = workout.userId,
-                routineId = workout.routineId ?: 0,
-                name = workout.name,
-                startTime = workout.startTime,
-                endTime = workout.endTime,
-                totalDuration = workout.totalDuration,
-                status = workout.status,
-                notes = workout.notes
+                isPaused = !it.isPaused,
+                successMessage = if (!it.isPaused) "Entrenamiento pausado" else "Entrenamiento reanudado"
+            )
+        }
+    }
+
+    private fun finishWorkout() {
+        viewModelScope.launch {
+            val currentState = _state.value
+            val currentTime = System.currentTimeMillis()
+            val duration = ((currentTime - currentState.startTime) / 1000).toInt()
+
+            currentState.currentWorkout?.let { workout ->
+                val finishedWorkout = workout.copy(
+                    endTime = currentTime,
+                    totalDuration = duration,
+                    status = "COMPLETED"
+                )
+
+                workoutRepository.updateWorkout(finishedWorkout).collect { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _state.update {
+                                it.copy(
+                                    isWorkoutActive = false,
+                                    isPaused = false,
+                                    currentWorkout = null,
+                                    currentScreen = WorkoutScreen.DASHBOARD,
+                                    showCompletionCelebration = true,
+                                    successMessage = "¡Entrenamiento completado! Duración: ${formatDuration(duration)}",
+                                    todayWorkouts = it.todayWorkouts + 1,
+                                    todayDuration = it.todayDuration + duration,
+                                    weeklyStreak = it.weeklyStreak + 1
+                                )
+                            }
+                            loadRecentWorkouts()
+                        }
+                        is Resource.Error -> {
+                            _state.update {
+                                it.copy(errorMessage = "Error al finalizar entrenamiento")
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _state.update { it.copy(isLoading = true) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelWorkout() {
+        viewModelScope.launch {
+            val currentState = _state.value
+            val currentTime = System.currentTimeMillis()
+            val duration = ((currentTime - currentState.startTime) / 1000).toInt()
+
+            currentState.currentWorkout?.let { workout ->
+                val cancelledWorkout = workout.copy(
+                    endTime = currentTime,
+                    totalDuration = duration,
+                    status = "CANCELLED"
+                )
+
+                workoutRepository.updateWorkout(cancelledWorkout).collect { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _state.update {
+                                it.copy(
+                                    isWorkoutActive = false,
+                                    isPaused = false,
+                                    currentWorkout = null,
+                                    currentScreen = WorkoutScreen.DASHBOARD,
+                                    successMessage = "Entrenamiento cancelado"
+                                )
+                            }
+                            loadRecentWorkouts()
+                        }
+                        is Resource.Error -> {
+                            _state.update {
+                                it.copy(errorMessage = "Error al cancelar entrenamiento")
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _state.update { it.copy(isLoading = true) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun completeSet() {
+        val currentState = _state.value
+        val routineExercise = currentState.routineExercises.find {
+            it.exerciseId == currentState.exercises.getOrNull(currentState.currentExerciseIndex)?.exerciseId
+        }
+        val totalSets = routineExercise?.sets ?: 3
+
+        if (currentState.currentSet < totalSets) {
+            _state.update {
+                it.copy(
+                    currentSet = it.currentSet + 1,
+                    isResting = true,
+                    restTimer = routineExercise?.restTime?.toLong() ?: 90L,
+                    successMessage = "¡Serie completada! Descansa ${routineExercise?.restTime ?: 90} segundos"
+                )
+            }
+        } else {
+            nextExercise()
+        }
+    }
+
+    private fun nextExercise() {
+        val currentState = _state.value
+        if (currentState.currentExerciseIndex < currentState.exercises.size - 1) {
+            _state.update {
+                it.copy(
+                    currentExerciseIndex = it.currentExerciseIndex + 1,
+                    currentSet = 1,
+                    isResting = false,
+                    restTimer = 0,
+                    successMessage = "¡Ejercicio completado! Siguiente ejercicio"
+                )
+            }
+        } else {
+            finishWorkout()
+        }
+    }
+
+    private fun startRest() {
+        val currentState = _state.value
+        val routineExercise = currentState.routineExercises.find {
+            it.exerciseId == currentState.exercises.getOrNull(currentState.currentExerciseIndex)?.exerciseId
+        }
+
+        _state.update {
+            it.copy(
+                isResting = true,
+                restTimer = routineExercise?.restTime?.toLong() ?: 90L
+            )
+        }
+    }
+
+    private fun skipRest() {
+        _state.update {
+            it.copy(
+                isResting = false,
+                restTimer = 0
+            )
+        }
+    }
+
+    private fun updateWorkoutTimer() {
+        _state.update {
+            it.copy(workoutTimer = it.workoutTimer + 1)
+        }
+    }
+
+    private fun updateRestTimer() {
+        val currentState = _state.value
+        if (currentState.restTimer > 0) {
+            _state.update {
+                it.copy(restTimer = it.restTimer - 1)
+            }
+        } else {
+            _state.update {
+                it.copy(
+                    isResting = false,
+                    restTimer = 0
+                )
+            }
+        }
+    }
+
+    private fun resetTimers() {
+        _state.update {
+            it.copy(
+                workoutTimer = 0,
+                restTimer = 0,
+                isResting = false
+            )
+        }
+    }
+
+    private fun loadRecentWorkouts() {
+        viewModelScope.launch {
+            workoutRepository.getWorkoutsByUser(_state.value.userId).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        val workouts = result.data ?: emptyList()
+                        val recentWorkouts = workouts.take(5)
+                        _state.update {
+                            it.copy(
+                                workouts = workouts,
+                                recentWorkouts = recentWorkouts,
+                                errorMessage = null
+                            )
+                        }
+                    }
+                    is Resource.Error -> {
+                        _state.update {
+                            it.copy(errorMessage = "Error al cargar entrenamientos recientes")
+                        }
+                    }
+                    is Resource.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showMotivation() {
+        val motivationMessages = listOf(
+            "¡Estás haciendo un trabajo increíble!",
+            "Cada repetición te acerca a tu objetivo",
+            "Tu fuerza mental es tu mayor arma",
+            "¡No pares, estás imparable!",
+            "El dolor de hoy es la fuerza de mañana"
+        )
+
+        _state.update {
+            it.copy(
+                showMotivationDialog = true,
+                motivationMessage = motivationMessages.random()
+            )
+        }
+    }
+
+    private fun showCelebration() {
+        _state.update {
+            it.copy(showCompletionCelebration = true)
+        }
+    }
+
+    private fun dismissDialogs() {
+        _state.update {
+            it.copy(
+                showMotivationDialog = false,
+                showCompletionCelebration = false,
+                showRestDialog = false
+            )
+        }
+    }
+
+    private fun clearMessages() {
+        _state.update {
+            it.copy(
+                errorMessage = null,
+                successMessage = null
             )
         }
     }
 
     fun onEvent(event: WorkoutEvent) {
         when (event) {
-            is WorkoutEvent.UserChange -> {
-                _state.update { it.copy(userId = event.userId) }
+            is WorkoutEvent.NavigateToScreen -> {
+                navigateToScreen(event.screen)
             }
-            is WorkoutEvent.RoutineIdChange -> {
-                _state.update { it.copy(routineId = event.routineId) }
+            is WorkoutEvent.ShowRoutineSelector -> {
+                showRoutineSelector()
             }
-            is WorkoutEvent.NameChange -> {
-                _state.update { it.copy(name = event.name) }
+            is WorkoutEvent.ShowQuickStart -> {
+                _state.update { it.copy(showQuickStart = true) }
             }
-            is WorkoutEvent.StartTimeChange -> {
-                _state.update { it.copy(startTime = event.startTime) }
+            is WorkoutEvent.BackToDashboard -> {
+                backToDashboard()
             }
-            is WorkoutEvent.EndTimeChange -> {
-                _state.update { it.copy(endTime = event.endTime) }
+            is WorkoutEvent.SelectRoutine -> {
+                selectRoutine(event.routine)
             }
-            is WorkoutEvent.StatusChange -> {
-                _state.update { it.copy(status = event.status) }
+            is WorkoutEvent.LoadAvailableRoutines -> {
+                loadAvailableRoutines()
             }
-            is WorkoutEvent.NotesChange -> {
-                _state.update { it.copy(notes = event.notes) }
+            is WorkoutEvent.StartWorkoutWithRoutine -> {
+                startWorkoutWithRoutine(event.routine)
             }
-            is WorkoutEvent.LoadWorkoutById -> {
-                loadWorkoutById(event.id)
-            }
-            is WorkoutEvent.LoadWorkoutsByUser -> {
-                loadWorkoutsByUser(event.userId)
-            }
-            is WorkoutEvent.LoadWorkoutsByRoutine -> {
-                loadWorkoutsByRoutine(event.routineId)
-            }
-            is WorkoutEvent.LoadWorkoutsByStatus -> {
-                loadWorkoutsByStatus(_state.value.userId, event.status)
-            }
-            is WorkoutEvent.StartWorkout -> {
-                startWorkout(event.routineId)
+            is WorkoutEvent.StartQuickWorkout -> {
+                startQuickWorkout()
             }
             is WorkoutEvent.PauseWorkout -> {
-                pauseWorkout(event.workoutId)
-            }
-            is WorkoutEvent.ResumeWorkout -> {
-                resumeWorkout(event.workoutId)
+                pauseWorkout()
             }
             is WorkoutEvent.FinishWorkout -> {
-                finishWorkout(event.workoutId)
+                finishWorkout()
             }
             is WorkoutEvent.CancelWorkout -> {
-                cancelWorkout(event.workoutId)
+                cancelWorkout()
             }
-            is WorkoutEvent.SelectWorkout -> {
-                _state.update {
-                    it.copy(selectedWorkout = event.workout)
-                }
-                populateStateFromWorkout(event.workout)
+            is WorkoutEvent.CompleteSet -> {
+                completeSet()
             }
-            is WorkoutEvent.CreateWorkout -> {
-                createWorkout()
+            is WorkoutEvent.NextExercise -> {
+                nextExercise()
             }
-            is WorkoutEvent.UpdateWorkout -> {
-                updateWorkout()
+            is WorkoutEvent.StartRest -> {
+                startRest()
             }
-            is WorkoutEvent.DeleteWorkout -> {
-                deleteWorkout()
+            is WorkoutEvent.SkipRest -> {
+                skipRest()
             }
-            is WorkoutEvent.LoadActiveWorkouts -> {
-                loadActiveWorkout(_state.value.userId)
+            is WorkoutEvent.UpdateWorkoutTimer -> {
+                updateWorkoutTimer()
+            }
+            is WorkoutEvent.UpdateRestTimer -> {
+                updateRestTimer()
+            }
+            is WorkoutEvent.ResetTimers -> {
+                resetTimers()
+            }
+            is WorkoutEvent.LoadRecentWorkouts -> {
+                loadRecentWorkouts()
+            }
+            is WorkoutEvent.ShowMotivation -> {
+                showMotivation()
+            }
+            is WorkoutEvent.ShowCelebration -> {
+                showCelebration()
+            }
+            is WorkoutEvent.DismissDialogs -> {
+                dismissDialogs()
+            }
+            is WorkoutEvent.ClearMessages -> {
+                clearMessages()
             }
             is WorkoutEvent.ClearError -> {
                 _state.update { it.copy(errorMessage = null) }
             }
-            is WorkoutEvent.ClearMessages -> {
-                _state.update {
-                    it.copy(
-                        errorMessage = null,
-                        successMessage = null,
-                        isCreated = false,
-                        isUpdated = false,
-                        isDeleted = false,
-                        workoutStarted = false,
-                        workoutPaused = false,
-                        workoutResumed = false,
-                        workoutFinished = false,
-                        workoutCancelled = false
-                    )
-                }
+            is WorkoutEvent.UserChange -> {
+                _state.update { it.copy(userId = event.userId) }
             }
-            is WorkoutEvent.LoadAllWorkouts -> {
-                loadWorkoutsByUser(_state.value.userId)
+            is WorkoutEvent.NameChange -> {
+                _state.update { it.copy(name = event.name) }
             }
-            is WorkoutEvent.LoadRecentWorkouts -> {
-                // Requeriría lógica adicional para filtrar entrenamientos recientes
-                loadWorkoutsByUser(_state.value.userId)
+            is WorkoutEvent.NotesChange -> {
+                _state.update { it.copy(notes = event.notes) }
             }
-            is WorkoutEvent.LoadWorkoutHistory -> {
-                // Cargar historial completo (misma lógica que LoadAllWorkouts)
-                loadWorkoutsByUser(_state.value.userId)
+
+            else -> {
+
             }
+        }
+    }
+
+    private fun formatDuration(seconds: Int): String {
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        val secs = seconds % 60
+
+        return if (hours > 0) {
+            String.format("%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            String.format("%d:%02d", minutes, secs)
         }
     }
 }

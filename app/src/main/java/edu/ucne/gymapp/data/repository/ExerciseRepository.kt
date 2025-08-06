@@ -2,6 +2,7 @@ package edu.ucne.gymapp.data.repository
 
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.dao.ExerciseDao
+import edu.ucne.gymapp.presentation.exercises.PredefinedExercises
 import edu.ucne.gymapp.data.local.entities.Exercise
 import edu.ucne.gymapp.data.local.relation.ExerciseWithMuscleGroup
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,15 @@ class ExerciseRepository @Inject constructor(
             emit(Resource.Error(e.message ?: "Este ejercicio no quiso entrar al sistema. Tal vez necesita calentar primero."))
         }
     }.flowOn(Dispatchers.IO)
+    suspend fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
+        try {
+            emit(Resource.Loading())
+            val exercises = exerciseDao.getExercisesByIds(exerciseIds)
+            emit(Resource.Success(exercises))
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "Error al obtener ejercicios por IDs"))
+        }
+    }.flowOn(Dispatchers.IO)
 
     fun insertExercises(exercises: List<Exercise>): Flow<Resource<List<Long>>> = flow {
         try {
@@ -30,6 +40,23 @@ class ExerciseRepository @Inject constructor(
             emit(Resource.Success(exerciseIds))
         } catch (e: Exception) {
             emit(Resource.Error(e.message ?: "Falló la carga masiva de ejercicios. Al parecer el servidor se quedó sin energía."))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun insertExercisesSynchronously(exercises: List<Exercise>): Flow<Resource<Unit>> = flow {
+        try {
+            emit(Resource.Loading())
+
+            exercises.forEachIndexed { index, exercise ->
+                try {
+                    val exerciseId = exerciseDao.insertExercise(exercise)
+                } catch (e: Exception) {
+                    throw e
+                }
+            }
+            emit(Resource.Success(Unit))
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "Error insertando ejercicios uno por uno"))
         }
     }.flowOn(Dispatchers.IO)
 
@@ -66,13 +93,39 @@ class ExerciseRepository @Inject constructor(
     fun getExercises(): Flow<Resource<List<Exercise>>> = flow {
         try {
             emit(Resource.Loading())
-            val exercises = exerciseDao.getExercises()
-            emit(Resource.Success(exercises))
+
+
+            val dbExercises = exerciseDao.getExercises().toMutableList()
+
+            val predefinedExercises = PredefinedExercises.getAll()
+
+            val existingIds = dbExercises.map { it.exerciseId }.toSet()
+            val missingPredefined = predefinedExercises.filter { it.exerciseId !in existingIds }
+
+            if (missingPredefined.isNotEmpty()) {
+                missingPredefined.forEach { exercise ->
+                    try {
+                        val insertedId = exerciseDao.insertExercise(exercise)
+                        dbExercises.add(exercise.copy(exerciseId = insertedId.toInt()))
+                    } catch (e: Exception) {
+                    }
+                }
+            }
+
+            val allExercises = dbExercises.sortedBy { it.exerciseId }
+
+
+            if (allExercises.isEmpty()) {
+            } else {
+                allExercises.forEachIndexed { index, exercise ->
+                }
+            }
+
+            emit(Resource.Success(allExercises))
         } catch (e: Exception) {
             emit(Resource.Error(e.message ?: "La lista de ejercicios no se pudo cargar. Posiblemente está haciendo cardio... lejos."))
         }
     }.flowOn(Dispatchers.IO)
-
     fun getExercisesByMuscleGroup(muscleGroupId: Int): Flow<Resource<List<Exercise>>> = flow {
         try {
             emit(Resource.Loading())

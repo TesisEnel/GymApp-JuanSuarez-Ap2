@@ -556,7 +556,6 @@ fun ExerciseDialog(
                     )
                 )
 
-                // Weight
                 OutlinedTextField(
                     value = state.weight?.toString() ?: "",
                     onValueChange = {
