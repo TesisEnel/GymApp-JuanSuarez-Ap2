@@ -25,7 +25,6 @@ sealed interface ExerciseEvent {
     data class IncrementPopularity(val exerciseId: Int) : ExerciseEvent
     data class FilterByDifficulties(val difficulties: List<String>) : ExerciseEvent
     data class FilterByMuscleGroups(val muscleGroupIds: List<Int>) : ExerciseEvent
-    data class CheckCanEditOrDelete(val exercise: Exercise?) : ExerciseEvent
     data class InsertPredefinedExercises(val exercises: List<Exercise>) : ExerciseEvent
     data object LoadExercisesByPopularity : ExerciseEvent
     data object CreateExercise : ExerciseEvent

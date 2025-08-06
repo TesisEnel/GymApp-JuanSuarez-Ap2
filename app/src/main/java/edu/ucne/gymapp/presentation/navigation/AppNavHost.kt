@@ -27,8 +27,6 @@ import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesScreen
 import edu.ucne.gymapp.presentation.userpreferences.UserPreferencesViewModel
 import edu.ucne.gymapp.presentation.users.LoginScreen
 import edu.ucne.gymapp.presentation.users.RegisterScreen
-import edu.ucne.gymapp.presentation.workoutexercises.WorkoutExerciseScreen
-import edu.ucne.gymapp.presentation.workoutexercises.WorkoutExerciseViewModel
 import edu.ucne.gymapp.presentation.workouts.WorkoutScreen
 import edu.ucne.gymapp.presentation.workouts.WorkoutViewModel
 
@@ -58,8 +56,7 @@ fun AppNavHost(
     val workoutViewModel: WorkoutViewModel = hiltViewModel()
     val workoutState by workoutViewModel.state.collectAsState()
 
-    val workoutExerciseViewModel: WorkoutExerciseViewModel = hiltViewModel()
-    val workoutExerciseState by workoutExerciseViewModel.state.collectAsState()
+
 
     val userPreferencesViewModel: UserPreferencesViewModel = hiltViewModel()
     val userPreferencesState by userPreferencesViewModel.state.collectAsState()
@@ -194,22 +191,6 @@ fun AppNavHost(
                 onEvent = workoutViewModel::onEvent,
                 onNavigateBack = {
                     navController.navigateUp()
-                },
-                onNavigateToWorkoutExercise = {
-                    navController.navigate(Screen.WorkoutExercise)
-                }
-            )
-        }
-
-        composable<Screen.WorkoutExercise> {
-            WorkoutExerciseScreen(
-                state = workoutExerciseState,
-                onEvent = workoutExerciseViewModel::onEvent,
-                onNavigateBack = {
-                    navController.navigateUp()
-                },
-                onNavigateToExerciseSet = {
-                    navController.navigate(Screen.ExerciseSet)
                 }
             )
         }
@@ -221,12 +202,7 @@ fun AppNavHost(
                 onNavigateBack = {
                     navController.navigateUp()
                 },
-                /*onLogout = {
-                    userPreferencesViewModel.onEvent(UserPreferencesEvent.Logout)
-                    navController.navigate(Screen.Login) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }*/
+
             )
         }
     }

@@ -2,9 +2,9 @@ package edu.ucne.gymapp.data.repository
 
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.dao.ExerciseDao
+import edu.ucne.gymapp.presentation.exercises.PredefinedExercises
 import edu.ucne.gymapp.data.local.entities.Exercise
 import edu.ucne.gymapp.data.local.relation.ExerciseWithMuscleGroup
-import edu.ucne.gymapp.presentation.exercises.PredefinedExercises
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -21,6 +21,15 @@ class ExerciseRepository @Inject constructor(
             emit(Resource.Success(exerciseId))
         } catch (e: Exception) {
             emit(Resource.Error(e.message ?: "Este ejercicio no quiso entrar al sistema. Tal vez necesita calentar primero."))
+        }
+    }.flowOn(Dispatchers.IO)
+    suspend fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
+        try {
+            emit(Resource.Loading())
+            val exercises = exerciseDao.getExercisesByIds(exerciseIds)
+            emit(Resource.Success(exercises))
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "Error al obtener ejercicios por IDs"))
         }
     }.flowOn(Dispatchers.IO)
 
@@ -88,22 +97,17 @@ class ExerciseRepository @Inject constructor(
 
             val dbExercises = exerciseDao.getExercises().toMutableList()
 
-
             val predefinedExercises = PredefinedExercises.getAll()
-
 
             val existingIds = dbExercises.map { it.exerciseId }.toSet()
             val missingPredefined = predefinedExercises.filter { it.exerciseId !in existingIds }
 
             if (missingPredefined.isNotEmpty()) {
-
                 missingPredefined.forEach { exercise ->
                     try {
                         val insertedId = exerciseDao.insertExercise(exercise)
-
                         dbExercises.add(exercise.copy(exerciseId = insertedId.toInt()))
                     } catch (e: Exception) {
-
                     }
                 }
             }
@@ -111,13 +115,9 @@ class ExerciseRepository @Inject constructor(
             val allExercises = dbExercises.sortedBy { it.exerciseId }
 
 
-
             if (allExercises.isEmpty()) {
-
             } else {
-
                 allExercises.forEachIndexed { index, exercise ->
-
                 }
             }
 

@@ -112,4 +112,13 @@ class RoutineExerciseRepository @Inject constructor(
             emit(Resource.Error(e.message ?: "Error al obtener el mayor orden de los ejercicios en la rutina con ID $routineId."))
         }
     }.flowOn(Dispatchers.IO)
+    fun getRoutineExercises(routineId: Int): Flow<Resource<List<RoutineExercise>>> = flow {
+        try {
+            emit(Resource.Loading())
+            val routineExercises = routineExerciseDao.getExercisesByRoutine(routineId)
+            emit(Resource.Success(routineExercises))
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "Error al obtener ejercicios de la rutina con ID $routineId."))
+        }
+    }.flowOn(Dispatchers.IO)
 }

@@ -1,86 +1,53 @@
 package edu.ucne.gymapp.presentation.workouts
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.style.*
+import androidx.compose.ui.unit.*
 import edu.ucne.gymapp.data.local.entities.Workout
 import edu.ucne.gymapp.ui.theme.RetrofitColors
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutScreen(
     state: WorkoutUiState,
     onEvent: (WorkoutEvent) -> Unit,
-    onNavigateBack: () -> Unit,
-    onNavigateToWorkoutExercise: () -> Unit
+    onNavigateBack: () -> Unit
 ) {
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var showActiveWorkout by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var workoutToDelete by remember { mutableStateOf<Workout?>(null) }
+    LaunchedEffect(Unit) {
+        onEvent(WorkoutEvent.LoadAvailableRoutines(state.userId))
+        onEvent(WorkoutEvent.LoadRecentWorkouts)
+    }
 
-    LaunchedEffect(state.isWorkoutActive) {
-        showActiveWorkout = state.isWorkoutActive
+    LaunchedEffect(state.isWorkoutActive, state.isPaused) {
+        if (state.isWorkoutActive && !state.isPaused) {
+            while (true) {
+                delay(1000)
+                onEvent(WorkoutEvent.UpdateWorkoutTimer)
+            }
+        }
+    }
+
+    LaunchedEffect(state.isResting, state.restTimer) {
+        if (state.isResting && state.restTimer > 0) {
+            while (state.restTimer > 0) {
+                delay(1000)
+                onEvent(WorkoutEvent.UpdateRestTimer)
+            }
+        }
     }
 
     Box(
@@ -95,135 +62,73 @@ fun WorkoutScreen(
                 )
             )
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+        when (state.currentScreen) {
+            WorkoutScreen.DASHBOARD -> {
+                DashboardScreen(
+                    state = state,
+                    onEvent = onEvent,
+                    onNavigateBack = onNavigateBack
+                )
+            }
+            WorkoutScreen.ROUTINE_SELECTOR -> {
+                RoutineSelectorScreen(
+                    state = state,
+                    onEvent = onEvent
+                )
+            }
+            WorkoutScreen.ACTIVE_WORKOUT -> {
+                ActiveWorkoutScreen(
+                    state = state,
+                    onEvent = onEvent
+                )
+            }
+            WorkoutScreen.REST_SCREEN -> {
+                RestScreen(
+                    state = state,
+                    onEvent = onEvent
+                )
+            }
+            WorkoutScreen.WORKOUT_COMPLETE -> {
+                WorkoutCompleteScreen(
+                    state = state,
+                    onEvent = onEvent
+                )
+            }
+            WorkoutScreen.WORKOUT_HISTORY -> {
+                WorkoutHistoryScreen(
+                    state = state,
+                    onEvent = onEvent
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = state.showMotivationDialog,
+            enter = scaleIn() + fadeIn(),
+            exit = scaleOut() + fadeOut()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = RetrofitColors.onSurface
-                    )
-                }
-
-                Text(
-                    text = "ENTRENAMIENTOS",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RetrofitColors.onSurface
-                )
-
-                IconButton(onClick = { showCreateDialog = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Crear entrenamiento",
-                        tint = RetrofitColors.Primary
-                    )
-                }
-            }
-
-            if (state.isWorkoutActive && state.currentWorkout != null) {
-                ActiveWorkoutCard(
-                    workout = state.currentWorkout,
-                    isPaused = state.isPaused,
-                    onPause = { onEvent(WorkoutEvent.PauseWorkout(state.currentWorkout.workoutId)) },
-                    onResume = { onEvent(WorkoutEvent.ResumeWorkout(state.currentWorkout.workoutId)) },
-                    onFinish = { onEvent(WorkoutEvent.FinishWorkout(state.currentWorkout.workoutId)) },
-                    onCancel = { onEvent(WorkoutEvent.CancelWorkout(state.currentWorkout.workoutId)) }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(listOf("Todos", "Completados", "En Progreso", "Pausados", "Cancelados")) { status ->
-                    FilterChip(
-                        onClick = {
-                            when (status) {
-                                "Todos" -> onEvent(WorkoutEvent.LoadAllWorkouts)
-                                "Completados" -> onEvent(WorkoutEvent.LoadWorkoutsByStatus("COMPLETED"))
-                                "En Progreso" -> onEvent(WorkoutEvent.LoadWorkoutsByStatus("IN_PROGRESS"))
-                                "Pausados" -> onEvent(WorkoutEvent.LoadWorkoutsByStatus("PAUSED"))
-                                "Cancelados" -> onEvent(WorkoutEvent.LoadWorkoutsByStatus("CANCELLED"))
-                            }
-                        },
-                        label = { Text(status) },
-                        selected = false,
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = RetrofitColors.Surface,
-                            labelColor = RetrofitColors.onSurface,
-                            selectedContainerColor = RetrofitColors.Primary,
-                            selectedLabelColor = RetrofitColors.onPrimary
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = RetrofitColors.Primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(state.workouts) { workout ->
-                        WorkoutCard(
-                            workout = workout,
-                            onSelect = { onEvent(WorkoutEvent.SelectWorkout(workout)) },
-                            onDelete = {
-                                workoutToDelete = workout
-                                showDeleteDialog = true
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (showCreateDialog) {
-            CreateWorkoutDialog(
-                state = state,
-                onEvent = onEvent,
-                onDismiss = { showCreateDialog = false }
+            MotivationDialog(
+                message = state.motivationMessage,
+                onDismiss = { onEvent(WorkoutEvent.DismissDialogs) }
             )
         }
 
-        if (showDeleteDialog && workoutToDelete != null) {
-            DeleteConfirmationDialog(
-                workoutName = workoutToDelete!!.name,
-                onConfirm = {
-                    onEvent(WorkoutEvent.DeleteWorkout)
-                    showDeleteDialog = false
-                    workoutToDelete = null
-                },
-                onDismiss = {
-                    showDeleteDialog = false
-                    workoutToDelete = null
-                }
+        AnimatedVisibility(
+            visible = state.showCompletionCelebration,
+            enter = scaleIn() + fadeIn(),
+            exit = scaleOut() + fadeOut()
+        ) {
+            CelebrationDialog(
+                onDismiss = { onEvent(WorkoutEvent.DismissDialogs) }
             )
         }
 
-        state.errorMessage?.let { errorMsg ->
+        state.errorMessage?.let { error ->
+            LaunchedEffect(error) {
+                delay(3000)
+                onEvent(WorkoutEvent.ClearMessages)
+            }
+
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -231,10 +136,11 @@ fun WorkoutScreen(
                     .padding(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.Red.copy(alpha = 0.9f)
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = errorMsg,
+                    text = error,
                     color = Color.White,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(16.dp),
@@ -243,7 +149,12 @@ fun WorkoutScreen(
             }
         }
 
-        state.successMessage?.let { successMsg ->
+        state.successMessage?.let { success ->
+            LaunchedEffect(success) {
+                delay(3000)
+                onEvent(WorkoutEvent.ClearMessages)
+            }
+
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -251,10 +162,11 @@ fun WorkoutScreen(
                     .padding(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.Green.copy(alpha = 0.9f)
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = successMsg,
+                    text = success,
                     color = Color.White,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(16.dp),
@@ -266,220 +178,66 @@ fun WorkoutScreen(
 }
 
 @Composable
-fun DeleteConfirmationDialog(
-    workoutName: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+fun RoutineSelectorScreen(
+    state: WorkoutUiState,
+    onEvent: (WorkoutEvent) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = RetrofitColors.Surface,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = Color.Red,
-                modifier = Modifier.size(32.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Confirmar eliminación",
-                color = RetrofitColors.onSurface,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-        },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "¿Estás seguro de que deseas eliminar el entrenamiento?",
-                    color = RetrofitColors.onSurface,
-                    textAlign = TextAlign.Center,
-                    fontSize = 14.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "\"$workoutName\"",
-                    color = RetrofitColors.Primary,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    fontSize = 16.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Esta acción no se puede deshacer.",
-                    color = RetrofitColors.Gray,
-                    textAlign = TextAlign.Center,
-                    fontSize = 12.sp,
-                    fontStyle = FontStyle.Italic
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Eliminar",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = RetrofitColors.Gray
-                )
-            ) {
-                Text(
-                    text = "Cancelar",
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        },
-        shape = RoundedCornerShape(16.dp)
-    )
-}
-
-@Composable
-fun ActiveWorkoutCard(
-    workout: Workout,
-    isPaused: Boolean,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onFinish: () -> Unit,
-    onCancel: () -> Unit
-) {
-    Card(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
-        colors = CardDefaults.cardColors(
-            containerColor = RetrofitColors.Primary.copy(alpha = 0.1f)
-        ),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(2.dp, RetrofitColors.Primary)
+            .fillMaxSize()
+            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            IconButton(
+                onClick = { onEvent(WorkoutEvent.BackToDashboard) },
+                modifier = Modifier
+                    .background(
+                        color = RetrofitColors.Surface,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .size(48.dp)
             ) {
-                Column {
-                    Text(
-                        text = "ENTRENAMIENTO ACTIVO",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RetrofitColors.Primary
-                    )
-                    Text(
-                        text = workout.name,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = RetrofitColors.onSurface
-                    )
-                }
-
                 Icon(
-                    imageVector = if (isPaused) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = RetrofitColors.Primary,
-                    modifier = Modifier.size(32.dp)
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = RetrofitColors.onSurface
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            WorkoutTimer(
-                startTime = workout.startTime,
-                isPaused = isPaused
+            Text(
+                text = "ELEGIR RUTINA",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Box(modifier = Modifier.size(48.dp))
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Button(
-                    onClick = if (isPaused) onResume else onPause,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPaused) Color.Green else Color.Yellow
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isPaused) "Continuar" else "Pausar",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Button(
-                    onClick = onFinish,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Finalizar",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                IconButton(
-                    onClick = onCancel,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            Color.Red.copy(alpha = 0.1f),
-                            RoundedCornerShape(12.dp)
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cancelar",
-                        tint = Color.Red
+                CircularProgressIndicator(
+                    color = RetrofitColors.Primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(state.availableRoutines) { routine ->
+                    RoutineCard(
+                        routine = routine,
+                        onClick = { onEvent(WorkoutEvent.StartWorkoutWithRoutine(routine)) }
                     )
                 }
             }
@@ -488,19 +246,29 @@ fun ActiveWorkoutCard(
 }
 
 @Composable
-fun WorkoutCard(
-    workout: Workout,
-    onSelect: () -> Unit,
-    onDelete: () -> Unit
+fun RoutineCard(
+    routine: edu.ucne.gymapp.data.local.entities.Routine,
+    onClick: () -> Unit
 ) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(150)
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSelect() },
+            .scale(scale)
+            .clickable {
+                isPressed = true
+                onClick()
+            },
         colors = CardDefaults.cardColors(
             containerColor = RetrofitColors.Surface
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -512,72 +280,57 @@ fun WorkoutCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = workout.name,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = routine.name,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
                         color = RetrofitColors.onSurface
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = formatDate(workout.startTime),
-                        fontSize = 12.sp,
-                        color = RetrofitColors.Gray
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatusChip(status = workout.status)
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar",
-                            tint = Color.Red,
-                            modifier = Modifier.size(18.dp)
+                    if (routine.description.isNotEmpty()) {
+                        Text(
+                            text = routine.description,
+                            fontSize = 14.sp,
+                            color = RetrofitColors.Gray,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }
+
+                DifficultyChip(difficulty = routine.difficulty)
             }
 
-            if (workout.totalDuration > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                InfoChip(
+                    icon = Icons.Default.Schedule,
+                    text = "${routine.estimatedDuration} min"
+                )
+                InfoChip(
+                    icon = Icons.Default.FitnessCenter,
+                    text = routine.targetMuscleGroups
+                )
+            }
+
+            if (routine.isActive) {
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Timer,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = RetrofitColors.Gray,
+                        tint = RetrofitColors.Primary,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = formatDuration(workout.totalDuration),
+                        text = "Rutina activa",
                         fontSize = 12.sp,
-                        color = RetrofitColors.Gray
-                    )
-                }
-            }
-
-            workout.notes?.let { notes ->
-                if (notes.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = notes,
-                        fontSize = 12.sp,
-                        color = RetrofitColors.LightGray,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        color = RetrofitColors.Primary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -586,159 +339,630 @@ fun WorkoutCard(
 }
 
 @Composable
-fun StatusChip(status: String) {
-    val (backgroundColor, textColor) = when (status) {
-        "COMPLETED" -> Pair(Color.Green.copy(alpha = 0.2f), Color.Green)
-        "IN_PROGRESS" -> Pair(RetrofitColors.Primary.copy(alpha = 0.2f), RetrofitColors.Primary)
-        "PAUSED" -> Pair(Color.Yellow.copy(alpha = 0.2f), Color.Yellow)
-        "CANCELLED" -> Pair(Color.Red.copy(alpha = 0.2f), Color.Red)
+fun DifficultyChip(difficulty: String) {
+    val (backgroundColor, textColor) = when (difficulty) {
+        "Principiante" -> Pair(Color.Green.copy(alpha = 0.2f), Color.Green)
+        "Intermedio" -> Pair(Color.Yellow.copy(alpha = 0.2f), Color.Yellow.copy(red = 0.8f))
+        "Avanzado" -> Pair(Color.Red.copy(alpha = 0.2f), Color.Red)
         else -> Pair(RetrofitColors.Gray.copy(alpha = 0.2f), RetrofitColors.Gray)
-    }
-
-    val displayText = when (status) {
-        "COMPLETED" -> "Completado"
-        "IN_PROGRESS" -> "En Progreso"
-        "PAUSED" -> "Pausado"
-        "CANCELLED" -> "Cancelado"
-        else -> "Desconocido"
     }
 
     Card(
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor
         ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Text(
-            text = displayText,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
+            text = difficulty,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
             color = textColor,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         )
     }
 }
 
-
 @Composable
-fun WorkoutTimer(
-    startTime: Long,
-    isPaused: Boolean
+fun InfoChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
 ) {
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
-
-    LaunchedEffect(isPaused) {
-        if (!isPaused) {
-            while (true) {
-                currentTime = System.currentTimeMillis()
-                delay(1000)
-            }
-        }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(
+                RetrofitColors.Primary.copy(alpha = 0.1f),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = RetrofitColors.Primary,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            color = RetrofitColors.Gray
+        )
     }
-
-    val elapsedSeconds = ((currentTime - startTime) / 1000).toInt()
-    val formattedTime = formatDuration(elapsedSeconds)
-
-    Text(
-        text = formattedTime,
-        fontSize = 32.sp,
-        fontWeight = FontWeight.Bold,
-        color = RetrofitColors.Primary,
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center
-    )
 }
 
 @Composable
-fun CreateWorkoutDialog(
+fun ActiveWorkoutScreen(
     state: WorkoutUiState,
-    onEvent: (WorkoutEvent) -> Unit,
+    onEvent: (WorkoutEvent) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        WorkoutHeader(
+            routineName = state.selectedRoutine?.name ?: "Entrenamiento Libre",
+            duration = state.workoutTimer,
+            isPaused = state.isPaused,
+            onPause = { onEvent(WorkoutEvent.PauseWorkout(state.currentWorkout?.workoutId ?: 0)) },
+            onStop = { onEvent(WorkoutEvent.CancelWorkout(state.currentWorkout?.workoutId ?: 0)) }
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (state.selectedRoutine != null && state.exercises.isNotEmpty()) {
+            ExerciseProgressSection(
+                state = state,
+                onEvent = onEvent
+            )
+        } else {
+            FreeWorkoutSection(
+                duration = state.workoutTimer,
+                onFinish = { onEvent(WorkoutEvent.FinishWorkout(state.currentWorkout?.workoutId ?: 0)) }
+            )
+        }
+    }
+}
+
+@Composable
+fun WorkoutHeader(
+    routineName: String,
+    duration: Long,
+    isPaused: Boolean,
+    onPause: () -> Unit,
+    onStop: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "ENTRENANDO",
+                    fontSize = 12.sp,
+                    color = RetrofitColors.Primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Text(
+                    text = routineName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = RetrofitColors.onSurface
+                )
+            }
+
+            Icon(
+                imageVector = if (isPaused) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = if (isPaused) Color.Yellow else RetrofitColors.Primary,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = RetrofitColors.Surface
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = formatDuration(duration.toInt()),
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = RetrofitColors.onSurface,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = onPause,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isPaused) RetrofitColors.Primary else Color.Yellow
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isPaused) "Continuar" else "Pausar",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Button(
+                onClick = onStop,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Finalizar",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseProgressSection(
+    state: WorkoutUiState,
+    onEvent: (WorkoutEvent) -> Unit
+) {
+    if (state.exercises.isNotEmpty() && state.currentExerciseIndex < state.exercises.size) {
+        val currentExercise = state.exercises[state.currentExerciseIndex]
+        val routineExercise = state.routineExercises.find { it.exerciseId == currentExercise.exerciseId }
+
+        CurrentExerciseCard(
+            exercise = currentExercise,
+            routineExercise = routineExercise,
+            currentSet = state.currentSet,
+            isResting = state.isResting,
+            restTimer = state.restTimer,
+            onCompleteSet = { onEvent(WorkoutEvent.CompleteSet(state.currentSet)) },
+            onSkipRest = { onEvent(WorkoutEvent.SkipRest) },
+            onNextExercise = { onEvent(WorkoutEvent.NextExercise) }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        ExerciseProgressIndicator(
+            currentExercise = state.currentExerciseIndex + 1,
+            totalExercises = state.exercises.size
+        )
+    }
+}
+
+@Composable
+fun CurrentExerciseCard(
+    exercise: edu.ucne.gymapp.data.local.entities.Exercise,
+    routineExercise: edu.ucne.gymapp.data.local.entities.RoutineExercise?,
+    currentSet: Int,
+    isResting: Boolean,
+    restTimer: Long,
+    onCompleteSet: () -> Unit,
+    onSkipRest: () -> Unit,
+    onNextExercise: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Surface
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = exercise.name,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
+            )
+
+            if (exercise.description.isNotEmpty()) {
+                Text(
+                    text = exercise.description,
+                    fontSize = 14.sp,
+                    color = RetrofitColors.Gray,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SetInfoCard(
+                    title = "Serie",
+                    value = "$currentSet/${routineExercise?.sets ?: 3}",
+                    modifier = Modifier.weight(1f)
+                )
+                SetInfoCard(
+                    title = "Reps",
+                    value = routineExercise?.reps ?: "10",
+                    modifier = Modifier.weight(1f)
+                )
+                routineExercise?.weight?.let { weight ->
+                    SetInfoCard(
+                        title = "Peso",
+                        value = "${weight}kg",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (isResting) {
+                RestTimerCard(
+                    timeLeft = restTimer,
+                    onSkip = onSkipRest
+                )
+            } else {
+                Button(
+                    onClick = onCompleteSet,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RetrofitColors.Primary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Completar Serie",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SetInfoCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Background
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                color = RetrofitColors.Gray
+            )
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+fun RestTimerCard(
+    timeLeft: Long,
+    onSkip: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Yellow.copy(alpha = 0.2f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "DESCANSANDO",
+                fontSize = 14.sp,
+                color = Color.Yellow.copy(red = 0.8f),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = formatDuration(timeLeft.toInt()),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onSkip,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Yellow.copy(red = 0.8f)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Saltar Descanso",
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseProgressIndicator(
+    currentExercise: Int,
+    totalExercises: Int
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Progreso del entrenamiento",
+                fontSize = 14.sp,
+                color = RetrofitColors.Gray
+            )
+            Text(
+                text = "$currentExercise / $totalExercises ejercicios",
+                fontSize = 14.sp,
+                color = RetrofitColors.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LinearProgressIndicator(
+            progress = currentExercise.toFloat() / totalExercises.toFloat(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            color = RetrofitColors.Primary,
+            trackColor = RetrofitColors.Gray.copy(alpha = 0.3f)
+        )
+    }
+}
+
+@Composable
+fun FreeWorkoutSection(
+    duration: Long,
+    onFinish: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Surface
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.Timer,
+                contentDescription = null,
+                tint = RetrofitColors.Primary,
+                modifier = Modifier.size(48.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Entrenamiento Libre",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Tiempo transcurrido: ${formatDuration(duration.toInt())}",
+                fontSize = 14.sp,
+                color = RetrofitColors.Gray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = onFinish,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RetrofitColors.Primary
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Finalizar Entrenamiento",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MotivationDialog(
+    message: String,
     onDismiss: () -> Unit
 ) {
-    var workoutName by remember { mutableStateOf("") }
-    var workoutNotes by remember { mutableStateOf("") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = RetrofitColors.Surface,
         title = {
             Text(
-                text = "Nuevo Entrenamiento",
+                text = "¡Sigue así!",
                 color = RetrofitColors.onSurface,
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
-            Column {
-                OutlinedTextField(
-                    value = workoutName,
-                    onValueChange = { workoutName = it },
-                    label = { Text("Nombre del entrenamiento") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = workoutNotes,
-                    onValueChange = { workoutNotes = it },
-                    label = { Text("Notas (opcional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    )
-                )
-            }
+            Text(
+                text = message,
+                color = RetrofitColors.Gray
+            )
         },
         confirmButton = {
             Button(
-                onClick = {
-                    onEvent(WorkoutEvent.NameChange(workoutName))
-                    onEvent(WorkoutEvent.NotesChange(workoutNotes.ifBlank { null }))
-                    onEvent(WorkoutEvent.CreateWorkout)
-                    onDismiss()
-                },
+                onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RetrofitColors.Primary
-                ),
-                enabled = workoutName.isNotBlank()
-            ) {
-                Text("Crear", color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = RetrofitColors.Gray
                 )
             ) {
-                Text("Cancelar")
+                Text("¡Vamos!", color = Color.White)
             }
         }
     )
 }
 
-private fun formatDate(timestamp: Long): String {
-    val date = Date(timestamp)
-    val format = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    return format.format(date)
+@Composable
+fun CelebrationDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = RetrofitColors.Surface,
+        title = {
+            Text(
+                text = "🎉 ¡Entrenamiento Completado!",
+                color = RetrofitColors.onSurface,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Text(
+                text = "¡Excelente trabajo! Has completado otro entrenamiento exitoso.",
+                color = RetrofitColors.Gray,
+                textAlign = TextAlign.Center
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RetrofitColors.Primary
+                )
+            ) {
+                Text("¡Genial!", color = Color.White)
+            }
+        }
+    )
+}
+
+@Composable
+fun RestScreen(state: WorkoutUiState, onEvent: (WorkoutEvent) -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Rest Screen - En desarrollo", color = RetrofitColors.onSurface)
+    }
+}
+
+@Composable
+fun WorkoutCompleteScreen(state: WorkoutUiState, onEvent: (WorkoutEvent) -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Workout Complete Screen - En desarrollo", color = RetrofitColors.onSurface)
+    }
+}
+
+@Composable
+fun WorkoutHistoryScreen(state: WorkoutUiState, onEvent: (WorkoutEvent) -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Workout History Screen - En desarrollo", color = RetrofitColors.onSurface)
+    }
 }
 
 private fun formatDuration(seconds: Int): String {
@@ -747,8 +971,341 @@ private fun formatDuration(seconds: Int): String {
     val secs = seconds % 60
 
     return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, secs)
+        String.format("%d:%02d:%02d", hours, minutes, secs)
     } else {
-        String.format("%02d:%02d", minutes, secs)
+        String.format("%d:%02d", minutes, secs)
+    }
+}
+
+private fun formatDate(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    val days = diff / (24 * 60 * 60 * 1000)
+
+    return when {
+        days == 0L -> "Hoy"
+        days == 1L -> "Ayer"
+        days < 7 -> "${days} días"
+        else -> "${days / 7} semanas"
+    }
+}
+
+@Composable
+fun DashboardScreen(
+    state: WorkoutUiState,
+    onEvent: (WorkoutEvent) -> Unit,
+    onNavigateBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier
+                    .background(
+                        color = RetrofitColors.Surface,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = RetrofitColors.onSurface
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "ENTRENAMIENTOS",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = RetrofitColors.onSurface
+                )
+                Text(
+                    text = "Supera tus límites",
+                    fontSize = 14.sp,
+                    color = RetrofitColors.Gray
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = RetrofitColors.Primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FitnessCenter,
+                    contentDescription = "Entrenamientos",
+                    tint = RetrofitColors.Primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        QuickActionCards(onEvent = onEvent)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        RecentWorkoutsSection(
+            workouts = state.recentWorkouts,
+            onEvent = onEvent
+        )
+    }
+}
+
+@Composable
+fun QuickActionCards(onEvent: (WorkoutEvent) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clickable { onEvent(WorkoutEvent.ShowRoutineSelector) },
+            colors = CardDefaults.cardColors(
+                containerColor = RetrofitColors.Surface
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Entrenar con Rutina",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RetrofitColors.onSurface
+                    )
+                    Text(
+                        text = "Elige una rutina y domina el día",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = RetrofitColors.Primary,
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .clickable { onEvent(WorkoutEvent.StartQuickWorkout) },
+            colors = CardDefaults.cardColors(
+                containerColor = RetrofitColors.Surface
+            ),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Inicio Rápido",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RetrofitColors.onSurface
+                    )
+                    Text(
+                        text = "Solo cronómetro, sin rutina",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = RetrofitColors.Primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = RetrofitColors.Primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RecentWorkoutsSection(
+    workouts: List<Workout>,
+    onEvent: (WorkoutEvent) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Entrenamientos Recientes",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (workouts.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = RetrofitColors.Surface
+                ),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FitnessCenter,
+                        contentDescription = null,
+                        tint = RetrofitColors.Gray,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "¡Comienza tu primer entrenamiento!",
+                        fontSize = 16.sp,
+                        color = RetrofitColors.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.height(200.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(workouts) { workout ->
+                    WorkoutHistoryCard(
+                        workout = workout,
+                        onClick = { onEvent(WorkoutEvent.SelectWorkout(workout)) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkoutHistoryCard(
+    workout: Workout,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Surface
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = RetrofitColors.Primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FitnessCenter,
+                    contentDescription = null,
+                    tint = RetrofitColors.Primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = workout.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = RetrofitColors.onSurface
+                )
+                Text(
+                    text = formatDate(workout.startTime),
+                    fontSize = 12.sp,
+                    color = RetrofitColors.Gray
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = formatDuration(workout.totalDuration),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = RetrofitColors.onSurface
+                )
+            }
+        }
     }
 }

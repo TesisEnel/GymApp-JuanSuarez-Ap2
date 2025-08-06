@@ -1,5 +1,6 @@
 package edu.ucne.gymapp.presentation.workouts
 
+import edu.ucne.gymapp.data.local.entities.Routine
 import edu.ucne.gymapp.data.local.entities.Workout
 
 sealed interface WorkoutEvent {
@@ -29,4 +30,29 @@ sealed interface WorkoutEvent {
     data object LoadWorkoutHistory : WorkoutEvent
     data object ClearError : WorkoutEvent
     data object ClearMessages : WorkoutEvent
+
+    data class NavigateToScreen(val screen: WorkoutScreen) : WorkoutEvent
+    data object ShowRoutineSelector : WorkoutEvent
+    data object ShowQuickStart : WorkoutEvent
+    data object BackToDashboard : WorkoutEvent
+
+    data class SelectRoutine(val routine: Routine) : WorkoutEvent
+    data class LoadAvailableRoutines(val userId: Int) : WorkoutEvent
+    data class StartWorkoutWithRoutine(val routine: Routine) : WorkoutEvent
+
+    data object StartQuickWorkout : WorkoutEvent
+    data object NextExercise : WorkoutEvent
+    data object PreviousExercise : WorkoutEvent
+    data class CompleteSet(val setNumber: Int) : WorkoutEvent
+    data object StartRest : WorkoutEvent
+    data object SkipRest : WorkoutEvent
+    data object CompleteExercise : WorkoutEvent
+
+    data object UpdateWorkoutTimer : WorkoutEvent
+    data object UpdateRestTimer : WorkoutEvent
+    data object ResetTimers : WorkoutEvent
+
+    data object ShowMotivation : WorkoutEvent
+    data object ShowCelebration : WorkoutEvent
+    data object DismissDialogs : WorkoutEvent
 }
