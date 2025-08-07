@@ -16,14 +16,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,6 +43,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -58,7 +67,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import edu.ucne.gymapp.data.local.entities.Exercise
+import edu.ucne.gymapp.data.local.entities.MuscleGroup
 import edu.ucne.gymapp.data.local.entities.Routine
+import edu.ucne.gymapp.data.local.entities.RoutineExercise
 import edu.ucne.gymapp.ui.theme.RetrofitColors
 import kotlinx.coroutines.delay
 
@@ -76,6 +89,24 @@ fun RoutineScreen(
         if (state.successMessage != null || state.errorMessage != null) {
             delay(3000)
             onEvent(RoutineEvent.ClearMessages)
+        }
+    }
+
+    LaunchedEffect(state.isCreated) {
+        if (state.isCreated) {
+            showCreateDialog = false
+        }
+    }
+
+    LaunchedEffect(state.isUpdated) {
+        if (state.isUpdated) {
+            showCreateDialog = false
+        }
+    }
+
+    LaunchedEffect(state.isDeleted) {
+        if (state.isDeleted) {
+            showCreateDialog = false
         }
     }
 
@@ -107,7 +138,15 @@ fun RoutineScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onNavigateBack) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier
+                        .background(
+                            color = RetrofitColors.Surface,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .size(48.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Volver",
@@ -122,7 +161,15 @@ fun RoutineScreen(
                     color = RetrofitColors.onSurface
                 )
 
-                IconButton(onClick = { showFilterDialog = true }) {
+                IconButton(
+                    onClick = { showFilterDialog = true },
+                    modifier = Modifier
+                        .background(
+                            color = RetrofitColors.Primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .size(48.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.FilterList,
                         contentDescription = "Filtrar",
@@ -138,7 +185,10 @@ fun RoutineScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { showCreateDialog = true },
+                    onClick = {
+                        onEvent(RoutineEvent.SelectRoutine(Routine()))
+                        showCreateDialog = true
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),
@@ -198,7 +248,7 @@ fun RoutineScreen(
                             routine = routine,
                             onToggleActive = { onEvent(RoutineEvent.ToggleRoutineActive(routine.routineId)) },
                             onComplete = { onEvent(RoutineEvent.IncrementTimesCompleted(routine.routineId)) },
-                            onSelect = { onEvent(RoutineEvent.SelectRoutine(routine)) }
+                            onSelect = { onEvent(RoutineEvent.ViewRoutine(routine)) }
                         )
                     }
                 }
@@ -237,24 +287,41 @@ fun RoutineScreen(
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = message,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(16.dp),
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = message,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onEvent(RoutineEvent.ClearMessages) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
     }
 
-    if (showCreateDialog || state.selectedRoutine != null) {
-        CreateEditRoutineDialog(
+    if (showCreateDialog) {
+        RoutineWizardDialog(
             state = state,
             onEvent = onEvent,
             onDismiss = {
                 showCreateDialog = false
-                onEvent(RoutineEvent.SelectRoutine(Routine()))
+                onEvent(RoutineEvent.HideExerciseSelection)
             }
         )
     }
@@ -276,8 +343,431 @@ fun RoutineScreen(
             }
         )
     }
-}
 
+    if (state.showRoutineDetails && state.routineToView != null) {
+        RoutineDetailsDialog(
+            routine = state.routineToView,
+            routineExercises = state.selectedExercises,
+            getExerciseDetails = { exerciseId ->
+                state.routineExercises.find { it.exerciseId == exerciseId }
+            },
+            onEdit = {
+                onEvent(RoutineEvent.SelectRoutine(state.routineToView!!))
+                onEvent(RoutineEvent.ClearMessages)
+                showCreateDialog = true
+            },
+            onDismiss = {
+                onEvent(RoutineEvent.ClearMessages)
+            }
+        )
+    }
+}
+@Composable
+fun RoutineDetailsDialog(
+    routine: Routine,
+    routineExercises: List<Exercise> = emptyList(),
+    getExerciseDetails: (Int) -> RoutineExercise? = { null },
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = RetrofitColors.Surface
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = routine.name,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RetrofitColors.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = RetrofitColors.Gray
+                        )
+                    }
+                }
+
+                if (routine.description.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = routine.description,
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray,
+                        lineHeight = 20.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = RetrofitColors.Background
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Duración:", fontSize = 14.sp, color = RetrofitColors.Gray)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = RetrofitColors.Primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "${routine.estimatedDuration} min",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = RetrofitColors.onSurface
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Dificultad:", fontSize = 14.sp, color = RetrofitColors.Gray)
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = when (routine.difficulty) {
+                                        "Principiante" -> Color.Green.copy(alpha = 0.2f)
+                                        "Intermedio" -> Color.Yellow.copy(alpha = 0.2f)
+                                        "Avanzado" -> Color.Red.copy(alpha = 0.2f)
+                                        else -> RetrofitColors.Gray.copy(alpha = 0.2f)
+                                    }
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = routine.difficulty,
+                                    fontSize = 12.sp,
+                                    color = when (routine.difficulty) {
+                                        "Principiante" -> Color.Green
+                                        "Intermedio" -> Color.Yellow.copy(red = 0.8f)
+                                        "Avanzado" -> Color.Red
+                                        else -> RetrofitColors.Gray
+                                    },
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Músculos:", fontSize = 14.sp, color = RetrofitColors.Gray)
+                            Text(
+                                routine.targetMuscleGroups,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = RetrofitColors.onSurface,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.End
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Completada:", fontSize = 14.sp, color = RetrofitColors.Gray)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = RetrofitColors.Primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "${routine.timesCompleted} veces",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = RetrofitColors.onSurface
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Estado:", fontSize = 14.sp, color = RetrofitColors.Gray)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(
+                                            color = if (routine.isActive) RetrofitColors.Primary else RetrofitColors.Gray,
+                                            shape = androidx.compose.foundation.shape.CircleShape
+                                        )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    if (routine.isActive) "Activa" else "Inactiva",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (routine.isActive) RetrofitColors.Primary else RetrofitColors.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (routineExercises.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ejercicios incluidos:",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RetrofitColors.onSurface
+                        )
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = RetrofitColors.Primary.copy(alpha = 0.1f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "${routineExercises.size} ejercicios",
+                                fontSize = 12.sp,
+                                color = RetrofitColors.Primary,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(routineExercises) { exercise ->
+                            val details = getExerciseDetails(exercise.exerciseId)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = RetrofitColors.Background
+                                ),
+                                border = BorderStroke(1.dp, RetrofitColors.Gray.copy(alpha = 0.2f)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FitnessCenter,
+                                        contentDescription = null,
+                                        tint = RetrofitColors.Primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = exercise.name,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = RetrofitColors.onSurface
+                                        )
+
+                                        if (exercise.description.isNotEmpty()) {
+                                            Text(
+                                                text = exercise.description,
+                                                fontSize = 12.sp,
+                                                color = RetrofitColors.Gray,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.padding(top = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = when (exercise.difficulty) {
+                                                        "Principiante" -> Color.Green.copy(alpha = 0.2f)
+                                                        "Intermedio" -> Color.Yellow.copy(alpha = 0.2f)
+                                                        "Avanzado" -> Color.Red.copy(alpha = 0.2f)
+                                                        else -> RetrofitColors.Gray.copy(alpha = 0.2f)
+                                                    }
+                                                ),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = exercise.difficulty,
+                                                    fontSize = 10.sp,
+                                                    color = when (exercise.difficulty) {
+                                                        "Principiante" -> Color.Green
+                                                        "Intermedio" -> Color.Yellow.copy(red = 0.8f)
+                                                        "Avanzado" -> Color.Red
+                                                        else -> RetrofitColors.Gray
+                                                    },
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+
+                                            if (exercise.equipment?.isNotBlank() == true) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "• ${exercise.equipment}",
+                                                    fontSize = 10.sp,
+                                                    color = RetrofitColors.Gray
+                                                )
+                                            }
+                                        }
+                                    }
+
+
+                                    Column(
+                                        horizontalAlignment = Alignment.End
+                                    ) {
+                                        Text(
+                                            text = "${details?.sets ?: 3} series",
+                                            fontSize = 10.sp,
+                                            color = RetrofitColors.Gray
+                                        )
+                                        Text(
+                                            text = "${details?.reps ?: "10"} reps",
+                                            fontSize = 10.sp,
+                                            color = RetrofitColors.Gray
+                                        )
+                                        Text(
+                                            text = "${details?.restTime ?: 90}s",
+                                            fontSize = 10.sp,
+                                            color = RetrofitColors.Gray
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = RetrofitColors.Background
+                        ),
+                        border = BorderStroke(1.dp, RetrofitColors.Gray.copy(alpha = 0.2f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FitnessCenter,
+                                contentDescription = null,
+                                tint = RetrofitColors.Gray,
+                                modifier = Modifier.size(32.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "No hay ejercicios asignados",
+                                fontSize = 14.sp,
+                                color = RetrofitColors.Gray,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Text(
+                                text = "Edita la rutina para agregar ejercicios",
+                                fontSize = 12.sp,
+                                color = RetrofitColors.Gray.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, RetrofitColors.Gray),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Cerrar", color = RetrofitColors.Gray)
+                    }
+
+                    Button(
+                        onClick = onEdit,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RetrofitColors.Primary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Editar", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
 @Composable
 fun RoutineCard(
     routine: Routine,
@@ -355,22 +845,34 @@ fun RoutineCard(
                     )
                 }
 
-                Text(
-                    text = routine.difficulty,
-                    fontSize = 12.sp,
-                    color = when (routine.difficulty) {
-                        "Principiante" -> Color.Green
-                        "Intermedio" -> Color.Yellow
-                        "Avanzado" -> Color.Red
-                        else -> RetrofitColors.Gray
-                    },
-                    fontWeight = FontWeight.Medium
-                )
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = when (routine.difficulty) {
+                            "Principiante" -> Color.Green.copy(alpha = 0.2f)
+                            "Intermedio" -> Color.Yellow.copy(alpha = 0.2f)
+                            "Avanzado" -> Color.Red.copy(alpha = 0.2f)
+                            else -> RetrofitColors.Gray.copy(alpha = 0.2f)
+                        }
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = routine.difficulty,
+                        fontSize = 12.sp,
+                        color = when (routine.difficulty) {
+                            "Principiante" -> Color.Green
+                            "Intermedio" -> Color.Yellow.copy(red = 0.8f)
+                            "Avanzado" -> Color.Red
+                            else -> RetrofitColors.Gray
+                        },
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             if (routine.targetMuscleGroups.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Músculos: ${routine.targetMuscleGroups}",
                     fontSize = 12.sp,
@@ -410,16 +912,18 @@ fun RoutineCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateEditRoutineDialog(
+fun RoutineWizardDialog(
     state: RoutineUiState,
     onEvent: (RoutineEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
     val isEditing = state.selectedRoutine != null && state.selectedRoutine.routineId != 0
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -432,231 +936,1050 @@ fun CreateEditRoutineDialog(
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
-                Text(
-                    text = if (isEditing) "Editar Rutina" else "Nueva Rutina",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RetrofitColors.onSurface,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                WizardHeader(
+                    isEditing = isEditing,
+                    currentStep = state.currentStep,
+                    onDismiss = onDismiss
                 )
 
-                OutlinedTextField(
-                    value = state.name,
-                    onValueChange = { onEvent(RoutineEvent.NameChange(it)) },
-                    label = { Text("Nombre de la rutina") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = state.description,
-                    onValueChange = { onEvent(RoutineEvent.DescriptionChange(it)) },
-                    label = { Text("Descripción") },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = state.estimatedDuration.toString(),
-                    onValueChange = {
-                        it.toIntOrNull()?.let { duration ->
-                            onEvent(RoutineEvent.EstimatedDurationChange(duration))
-                        }
-                    },
-                    label = { Text("Duración (minutos)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                var difficultyExpanded by remember { mutableStateOf(false) }
-                val difficulties = listOf("Principiante", "Intermedio", "Avanzado")
-
-                ExposedDropdownMenuBox(
-                    expanded = difficultyExpanded,
-                    onExpandedChange = { difficultyExpanded = !difficultyExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = state.difficulty,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Dificultad") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = difficultyExpanded)
-                        },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RetrofitColors.Primary,
-                            unfocusedBorderColor = RetrofitColors.Gray,
-                            focusedLabelColor = RetrofitColors.Primary,
-                            unfocusedLabelColor = RetrofitColors.Gray,
-                            focusedTextColor = RetrofitColors.onSurface,
-                            unfocusedTextColor = RetrofitColors.onSurface
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    ExposedDropdownMenu(
-                        expanded = difficultyExpanded,
-                        onDismissRequest = { difficultyExpanded = false }
-                    ) {
-                        difficulties.forEach { difficulty ->
-                            DropdownMenuItem(
-                                text = { Text(difficulty) },
-                                onClick = {
-                                    onEvent(RoutineEvent.DifficultyChange(difficulty))
-                                    difficultyExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = state.targetMuscleGroups,
-                    onValueChange = { onEvent(RoutineEvent.TargetMuscleGroupsChange(it)) },
-                    label = { Text("Grupos musculares") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RetrofitColors.Primary,
-                        unfocusedBorderColor = RetrofitColors.Gray,
-                        focusedLabelColor = RetrofitColors.Primary,
-                        unfocusedLabelColor = RetrofitColors.Gray,
-                        focusedTextColor = RetrofitColors.onSurface,
-                        unfocusedTextColor = RetrofitColors.onSurface,
-                        cursorColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Rutina activa",
-                        color = RetrofitColors.onSurface,
-                        fontSize = 16.sp
-                    )
-
-                    Switch(
-                        checked = state.isActive,
-                        onCheckedChange = { onEvent(RoutineEvent.IsActiveChange(it)) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = RetrofitColors.Primary,
-                            uncheckedThumbColor = RetrofitColors.Gray,
-                            uncheckedTrackColor = RetrofitColors.Gray.copy(alpha = 0.3f)
+                when (state.currentStep) {
+                    RoutineCreationStep.BASIC_INFO -> {
+                        BasicInfoStep(
+                            state = state,
+                            onEvent = onEvent
                         )
-                    )
+                    }
+                    RoutineCreationStep.MUSCLE_GROUP -> {
+                        MuscleGroupStep(
+                            state = state,
+                            onEvent = onEvent
+                        )
+                    }
+                    RoutineCreationStep.EXERCISE -> {
+                        ExerciseSelectionStep(
+                            state = state,
+                            onEvent = onEvent
+                        )
+                    }
+                    RoutineCreationStep.EXERCISE_CONFIG -> {
+                        ExerciseConfigStep(
+                            state = state,
+                            onEvent = onEvent
+                        )
+                    }
+                    RoutineCreationStep.REVIEW -> {
+                        ReviewStep(
+                            state = state,
+                            onEvent = onEvent
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                WizardNavigation(
+                    state = state,
+                    onEvent = onEvent,
+                    isEditing = isEditing,
+                    onDismiss = onDismiss
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun WizardHeader(
+    isEditing: Boolean,
+    currentStep: RoutineCreationStep,
+    onDismiss: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isEditing) "Editar Rutina" else "Nueva Rutina",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = RetrofitColors.onSurface
+            )
+
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cerrar",
+                    tint = RetrofitColors.Gray
+                )
+            }
+        }
+
+        if (!isEditing) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val progress = when (currentStep) {
+                RoutineCreationStep.BASIC_INFO -> 0.2f
+                RoutineCreationStep.MUSCLE_GROUP -> 0.4f
+                RoutineCreationStep.EXERCISE -> 0.6f
+                RoutineCreationStep.EXERCISE_CONFIG -> 0.8f
+                RoutineCreationStep.REVIEW -> 1.0f
+            }
+
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth(),
+                color = RetrofitColors.Primary,
+                trackColor = RetrofitColors.Primary.copy(alpha = 0.2f)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = when (currentStep) {
+                    RoutineCreationStep.BASIC_INFO -> "Paso 1 de 5: Información básica"
+                    RoutineCreationStep.MUSCLE_GROUP -> "Paso 2 de 5: Seleccionar grupo muscular"
+                    RoutineCreationStep.EXERCISE -> "Paso 3 de 5: Elegir ejercicios"
+                    RoutineCreationStep.EXERCISE_CONFIG -> "Paso 4 de 5: Configurar ejercicios"
+                    RoutineCreationStep.REVIEW -> "Paso 5 de 5: Revisar y crear"
+                },
+                fontSize = 14.sp,
+                color = RetrofitColors.Gray
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BasicInfoStep(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = state.name,
+            onValueChange = { onEvent(RoutineEvent.NameChange(it)) },
+            label = { Text("Nombre de la rutina") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RetrofitColors.Primary,
+                unfocusedBorderColor = RetrofitColors.Gray,
+                focusedLabelColor = RetrofitColors.Primary,
+                unfocusedLabelColor = RetrofitColors.Gray,
+                focusedTextColor = RetrofitColors.onSurface,
+                unfocusedTextColor = RetrofitColors.onSurface,
+                cursorColor = RetrofitColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        OutlinedTextField(
+            value = state.description,
+            onValueChange = { onEvent(RoutineEvent.DescriptionChange(it)) },
+            label = { Text("Descripción") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RetrofitColors.Primary,
+                unfocusedBorderColor = RetrofitColors.Gray,
+                focusedLabelColor = RetrofitColors.Primary,
+                unfocusedLabelColor = RetrofitColors.Gray,
+                focusedTextColor = RetrofitColors.onSurface,
+                unfocusedTextColor = RetrofitColors.onSurface,
+                cursorColor = RetrofitColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        OutlinedTextField(
+            value = state.estimatedDuration.toString(),
+            onValueChange = {
+                it.toIntOrNull()?.let { duration ->
+                    onEvent(RoutineEvent.EstimatedDurationChange(duration))
+                }
+            },
+            label = { Text("Duración (minutos)") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RetrofitColors.Primary,
+                unfocusedBorderColor = RetrofitColors.Gray,
+                focusedLabelColor = RetrofitColors.Primary,
+                unfocusedLabelColor = RetrofitColors.Gray,
+                focusedTextColor = RetrofitColors.onSurface,
+                unfocusedTextColor = RetrofitColors.onSurface,
+                cursorColor = RetrofitColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        var difficultyExpanded by remember { mutableStateOf(false) }
+        val difficulties = listOf("Principiante", "Intermedio", "Avanzado")
+
+        ExposedDropdownMenuBox(
+            expanded = difficultyExpanded,
+            onExpandedChange = { difficultyExpanded = !difficultyExpanded }
+        ) {
+            OutlinedTextField(
+                value = state.difficulty,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Dificultad") },
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = difficultyExpanded)
+                },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = RetrofitColors.Primary,
+                    unfocusedBorderColor = RetrofitColors.Gray,
+                    focusedLabelColor = RetrofitColors.Primary,
+                    unfocusedLabelColor = RetrofitColors.Gray,
+                    focusedTextColor = RetrofitColors.onSurface,
+                    unfocusedTextColor = RetrofitColors.onSurface
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            ExposedDropdownMenu(
+                expanded = difficultyExpanded,
+                onDismissRequest = { difficultyExpanded = false }
+            ) {
+                difficulties.forEach { difficulty ->
+                    DropdownMenuItem(
+                        text = { Text(difficulty) },
+                        onClick = {
+                            onEvent(RoutineEvent.DifficultyChange(difficulty))
+                            difficultyExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Rutina activa",
+                color = RetrofitColors.onSurface,
+                fontSize = 16.sp
+            )
+
+            Switch(
+                checked = state.isActive,
+                onCheckedChange = { onEvent(RoutineEvent.IsActiveChange(it)) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = RetrofitColors.Primary,
+                    uncheckedThumbColor = RetrofitColors.Gray,
+                    uncheckedTrackColor = RetrofitColors.Gray.copy(alpha = 0.3f)
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun MuscleGroupStep(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit
+) {
+    LaunchedEffect(Unit) {
+        if (state.muscleGroups.isEmpty()) {
+            onEvent(RoutineEvent.LoadMuscleGroups)
+        }
+    }
+
+    Column {
+        Text(
+            text = "Selecciona el grupo muscular principal:",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = RetrofitColors.onSurface,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = RetrofitColors.Primary)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.height(300.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.muscleGroups) { muscleGroup ->
+                    MuscleGroupCard(
+                        muscleGroup = muscleGroup,
+                        isSelected = state.selectedMuscleGroups.any { it.muscleGroupId == muscleGroup.muscleGroupId },                        onSelect = { onEvent(RoutineEvent.SelectMuscleGroup(muscleGroup)) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MuscleGroupCard(
+    muscleGroup: MuscleGroup,
+    isSelected: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                RetrofitColors.Primary.copy(alpha = 0.1f)
+            else
+                RetrofitColors.Background
+        ),
+        border = if (isSelected)
+            BorderStroke(2.dp, RetrofitColors.Primary)
+        else
+            BorderStroke(1.dp, RetrofitColors.Gray.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = muscleGroup.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = RetrofitColors.onSurface
+                )
+
+                Text(
+                    text = muscleGroup.description,
+                    fontSize = 14.sp,
+                    color = RetrofitColors.Gray,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Seleccionado",
+                    tint = RetrofitColors.Primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseSelectionStep(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Ejercicios para ${state.selectedMuscleGroups.joinToString(", ") { it.name }}:",                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = RetrofitColors.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+
+            Text(
+                text = "${state.selectedExercises.size} seleccionados",
+                fontSize = 14.sp,
+                color = RetrofitColors.Primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        OutlinedTextField(
+            value = state.exerciseSearchQuery,
+            onValueChange = { onEvent(RoutineEvent.SearchExercises(it)) },
+            label = { Text("Buscar ejercicios") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Buscar",
+                    tint = RetrofitColors.Gray
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RetrofitColors.Primary,
+                unfocusedBorderColor = RetrofitColors.Gray,
+                focusedLabelColor = RetrofitColors.Primary,
+                unfocusedLabelColor = RetrofitColors.Gray,
+                focusedTextColor = RetrofitColors.onSurface,
+                unfocusedTextColor = RetrofitColors.onSurface,
+                cursorColor = RetrofitColors.Primary
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        if (state.selectedExercises.isNotEmpty()) {
+            Text(
+                text = "Ejercicios seleccionados:",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = RetrofitColors.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                items(state.selectedExercises) { exercise ->
+                    SelectedExerciseChip(
+                        exercise = exercise,
+                        onRemove = { onEvent(RoutineEvent.RemoveExercise(exercise)) }
+                    )
+                }
+            }
+        }
+
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = RetrofitColors.Primary)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.height(250.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.filteredExercises) { exercise ->
+                    ExerciseSelectionCard(
+                        exercise = exercise,
+                        isSelected = state.selectedExercises.any { it.exerciseId == exercise.exerciseId },
+                        onToggleSelect = { onEvent(RoutineEvent.SelectExercise(exercise)) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SelectedExerciseChip(
+    exercise: Exercise,
+    onRemove: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Primary.copy(alpha = 0.1f)
+        ),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = exercise.name,
+                fontSize = 12.sp,
+                color = RetrofitColors.Primary,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remover",
+                    tint = RetrofitColors.Primary,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseSelectionCard(
+    exercise: Exercise,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleSelect() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                RetrofitColors.Primary.copy(alpha = 0.1f)
+            else
+                RetrofitColors.Background
+        ),
+        border = if (isSelected)
+            BorderStroke(2.dp, RetrofitColors.Primary)
+        else
+            BorderStroke(1.dp, RetrofitColors.Gray.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = exercise.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = RetrofitColors.onSurface
+                )
+
+                Text(
+                    text = exercise.description,
+                    fontSize = 12.sp,
+                    color = RetrofitColors.Gray,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        border = BorderStroke(1.dp, RetrofitColors.Gray),
-                        shape = RoundedCornerShape(12.dp)
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (exercise.difficulty) {
+                                "Principiante" -> Color.Green.copy(alpha = 0.2f)
+                                "Intermedio" -> Color.Yellow.copy(alpha = 0.2f)
+                                "Avanzado" -> Color.Red.copy(alpha = 0.2f)
+                                else -> RetrofitColors.Gray.copy(alpha = 0.2f)
+                            }
+                        ),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "Cancelar",
-                            color = RetrofitColors.Gray
+                            text = exercise.difficulty,
+                            fontSize = 10.sp,
+                            color = when (exercise.difficulty) {
+                                "Principiante" -> Color.Green
+                                "Intermedio" -> Color.Yellow.copy(red = 0.8f)
+                                "Avanzado" -> Color.Red
+                                else -> RetrofitColors.Gray
+                            },
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
-                    Button(
-                        onClick = {
-                            if (isEditing) {
-                                onEvent(RoutineEvent.UpdateRoutine)
-                            } else {
-                                onEvent(RoutineEvent.CreateRoutine)
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RetrofitColors.Primary
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        enabled = !state.isLoading
+                    if (exercise.equipment?.isNotBlank() == true) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.FitnessCenter,
+                            contentDescription = "Equipo",
+                            tint = RetrofitColors.Gray,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Seleccionado",
+                    tint = RetrofitColors.Primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseConfigStep(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit
+) {
+    Column {
+        Text(
+            text = "Configuración de ejercicios:",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = RetrofitColors.onSurface,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        if (state.selectedExercises.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No hay ejercicios seleccionados",
+                    fontSize = 14.sp,
+                    color = RetrofitColors.Gray
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.height(300.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(state.selectedExercises) { exercise ->
+                    ExerciseConfigCard(exercise = exercise)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExerciseConfigCard(exercise: Exercise) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = RetrofitColors.Background
+        ),
+        border = BorderStroke(1.dp, RetrofitColors.Gray.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = exercise.name,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = RetrofitColors.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = RetrofitColors.Surface
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (state.isLoading) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        } else {
-                            Text(
-                                text = if (isEditing) "Actualizar" else "Crear",
-                                color = Color.White
-                            )
-                        }
+                        Text(
+                            text = "Series",
+                            fontSize = 12.sp,
+                            color = RetrofitColors.Gray
+                        )
+                        Text(
+                            text = "3",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RetrofitColors.onSurface
+                        )
                     }
                 }
 
-                if (isEditing) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = { onEvent(RoutineEvent.DeleteRoutine) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = RetrofitColors.Surface
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Eliminar Rutina",
-                            color = Color.White
+                            text = "Reps",
+                            fontSize = 12.sp,
+                            color = RetrofitColors.Gray
+                        )
+                        Text(
+                            text = "10",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RetrofitColors.onSurface
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = RetrofitColors.Surface
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Descanso",
+                            fontSize = 12.sp,
+                            color = RetrofitColors.Gray
+                        )
+                        Text(
+                            text = "90s",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = RetrofitColors.onSurface
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ReviewStep(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Resumen de la rutina:",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = RetrofitColors.onSurface
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = RetrofitColors.Background
+            ),
+            border = BorderStroke(1.dp, RetrofitColors.Primary.copy(alpha = 0.3f)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Nombre:",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray
+                    )
+                    Text(
+                        text = state.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = RetrofitColors.onSurface
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Duración:",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray
+                    )
+                    Text(
+                        text = "${state.estimatedDuration} minutos",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = RetrofitColors.onSurface
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Dificultad:",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray
+                    )
+                    Text(
+                        text = state.difficulty,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = RetrofitColors.onSurface
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Grupo muscular:",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray
+                    )
+                    Text(
+                        text = state.selectedMuscleGroups.joinToString(", ") { it.name }.ifEmpty { "No seleccionado" },
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = RetrofitColors.onSurface
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Ejercicios:",
+                        fontSize = 14.sp,
+                        color = RetrofitColors.Gray
+                    )
+                    Text(
+                        text = "${state.selectedExercises.size} ejercicios",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = RetrofitColors.Primary
+                    )
+                }
+            }
+        }
+
+        if (state.selectedExercises.isNotEmpty()) {
+            Text(
+                text = "Ejercicios incluidos:",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = RetrofitColors.onSurface
+            )
+
+            LazyColumn(
+                modifier = Modifier.height(150.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(state.selectedExercises) { exercise ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = RetrofitColors.Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = exercise.name,
+                            fontSize = 14.sp,
+                            color = RetrofitColors.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WizardNavigation(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit,
+    isEditing: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (isEditing) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, RetrofitColors.Gray),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Cancelar",
+                    color = RetrofitColors.Gray
+                )
+            }
+
+            Button(
+                onClick = { onEvent(RoutineEvent.UpdateRoutine) },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RetrofitColors.Primary
+                ),
+                shape = RoundedCornerShape(12.dp),
+                enabled = !state.isLoading
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Text("Actualizar", color = Color.White)
+                }
+            }
+        }
+
+        if (state.selectedRoutine != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { onEvent(RoutineEvent.DeleteRoutine) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Eliminar Rutina", color = Color.White)
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (state.currentStep != RoutineCreationStep.BASIC_INFO) {
+                OutlinedButton(
+                    onClick = { onEvent(RoutineEvent.PreviousStep) },
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, RetrofitColors.Gray),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Anterior", color = RetrofitColors.Gray)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, RetrofitColors.Gray),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cancelar", color = RetrofitColors.Gray)
+                }
+            }
+
+            Button(
+                onClick = {
+                    when (state.currentStep) {
+                        RoutineCreationStep.REVIEW -> {
+                            onEvent(RoutineEvent.CreateRoutine)
+                        }
+                        RoutineCreationStep.MUSCLE_GROUP -> {
+                            if (state.selectedMuscleGroups.isNotEmpty()) {
+                                onEvent(RoutineEvent.NextStep)
+                            }
+                        }
+                        else -> {
+                            onEvent(RoutineEvent.NextStep)
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RetrofitColors.Primary
+                ),
+                shape = RoundedCornerShape(12.dp),
+                enabled = !state.isLoading && canProceedToNextStep(state)
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Text(
+                        text = when (state.currentStep) {
+                            RoutineCreationStep.REVIEW -> "Crear Rutina"
+                            else -> "Siguiente"
+                        },
+                        color = Color.White
+                    )
+                    if (state.currentStep != RoutineCreationStep.REVIEW) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun canProceedToNextStep(state: RoutineUiState): Boolean {
+    return when (state.currentStep) {
+        RoutineCreationStep.BASIC_INFO -> {
+            state.name.isNotBlank() && state.estimatedDuration > 0
+        }
+        RoutineCreationStep.MUSCLE_GROUP -> {
+            state.selectedMuscleGroups.isNotEmpty()
+        }
+        RoutineCreationStep.EXERCISE -> {
+            state.selectedExercises.isNotEmpty()
+        }
+        RoutineCreationStep.EXERCISE_CONFIG -> true
+        RoutineCreationStep.REVIEW -> true
     }
 }
 

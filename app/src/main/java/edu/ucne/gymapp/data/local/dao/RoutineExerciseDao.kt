@@ -11,6 +11,8 @@ import edu.ucne.gymapp.data.local.entities.RoutineExercise
 interface RoutineExerciseDao {
     @Insert
     suspend fun insertRoutineExercise(routineExercise: RoutineExercise): Long
+    @Query("SELECT * FROM routine_exercises WHERE routineId = :routineId ORDER BY `order`")
+    suspend fun getRoutineExercisesByRoutineId(routineId: Int): List<RoutineExercise>
 
     @Insert
     suspend fun insertRoutineExercises(routineExercises: List<RoutineExercise>): List<Long>

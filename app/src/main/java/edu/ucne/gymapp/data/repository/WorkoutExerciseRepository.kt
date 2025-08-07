@@ -3,6 +3,7 @@ package edu.ucne.gymapp.data.repository
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.dao.WorkoutExerciseDao
 import edu.ucne.gymapp.data.local.entities.WorkoutExercise
+import edu.ucne.gymapp.data.local.relation.UserWithRoutines
 import edu.ucne.gymapp.data.local.relation.WorkoutExerciseComplete
 import edu.ucne.gymapp.data.local.relation.WorkoutExerciseWithSets
 import kotlinx.coroutines.Dispatchers

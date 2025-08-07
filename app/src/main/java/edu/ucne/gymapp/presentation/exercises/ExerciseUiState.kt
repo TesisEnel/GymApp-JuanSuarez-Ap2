@@ -18,6 +18,7 @@ data class ExerciseUiState(
     val commonMistakes: String? = null,
     val exercises: List<Exercise> = emptyList(),
     val selectedExercise: Exercise? = null,
+    val canEditOrDeleteSelected: Boolean = false,
     val exerciseWithMuscleGroup: ExerciseWithMuscleGroup? = null,
     val filteredExercises: List<Exercise> = emptyList(),
     val selectedDifficulties: List<String> = emptyList(),
