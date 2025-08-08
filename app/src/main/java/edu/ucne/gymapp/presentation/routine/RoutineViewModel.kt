@@ -25,6 +25,10 @@ class RoutineViewModel @Inject constructor(
     private val routineExerciseRepository: RoutineExerciseRepository
 ) : ViewModel() {
 
+    companion object {
+        private const val ERROR_LOADING_EXERCISES = "Error al cargar ejercicios"
+    }
+
     private val _state = MutableStateFlow(RoutineUiState())
     val state = _state.asStateFlow()
 
@@ -119,7 +123,7 @@ class RoutineViewModel @Inject constructor(
                                                 it.copy(
                                                     isLoading = false,
                                                     routineExercises = routineExercises,
-                                                    errorMessage = exerciseResult.message ?: "Error al cargar ejercicios"
+                                                    errorMessage = exerciseResult.message ?: ERROR_LOADING_EXERCISES
                                                 )
                                             }
                                         }
@@ -141,7 +145,7 @@ class RoutineViewModel @Inject constructor(
                             _state.update {
                                 it.copy(
                                     isLoading = false,
-                                    errorMessage = routineExerciseResult.message ?: "Error al cargar ejercicios de la rutina"
+                                    errorMessage = routineExerciseResult.message ?: ERROR_LOADING_EXERCISES
                                 )
                             }
                         }
@@ -525,7 +529,7 @@ class RoutineViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar ejercicios"
+                                errorMessage = result.message ?: ERROR_LOADING_EXERCISES
                             )
                         }
                     }
@@ -556,7 +560,7 @@ class RoutineViewModel @Inject constructor(
                         _state.update {
                             it.copy(
                                 isLoading = false,
-                                errorMessage = result.message ?: "Error al cargar ejercicios"
+                                errorMessage = result.message ?: ERROR_LOADING_EXERCISES
                             )
                         }
                     }
