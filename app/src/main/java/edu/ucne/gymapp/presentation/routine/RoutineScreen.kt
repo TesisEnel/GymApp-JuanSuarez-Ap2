@@ -75,6 +75,15 @@ import edu.ucne.gymapp.data.local.entities.RoutineExercise
 import edu.ucne.gymapp.ui.theme.RetrofitColors
 import kotlinx.coroutines.delay
 
+
+import androidx.compose.foundation.layout.*
+
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+
+
+
 @Composable
 fun RoutineScreen(
     state: RoutineUiState,
@@ -85,31 +94,18 @@ fun RoutineScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.successMessage, state.errorMessage) {
+    // Simplify LaunchedEffects into one block when possible
+    LaunchedEffect(state.successMessage, state.errorMessage, state.isCreated, state.isUpdated, state.isDeleted) {
         if (state.successMessage != null || state.errorMessage != null) {
             delay(3000)
             onEvent(RoutineEvent.ClearMessages)
         }
-    }
-
-    LaunchedEffect(state.isCreated) {
-        if (state.isCreated) {
+        if (state.isCreated || state.isUpdated || state.isDeleted) {
             showCreateDialog = false
         }
     }
 
-    LaunchedEffect(state.isUpdated) {
-        if (state.isUpdated) {
-            showCreateDialog = false
-        }
-    }
-
-    LaunchedEffect(state.isDeleted) {
-        if (state.isDeleted) {
-            showCreateDialog = false
-        }
-    }
-
+    // Load all routines on first composition
     LaunchedEffect(Unit) {
         onEvent(RoutineEvent.LoadAllRoutines)
     }
@@ -131,236 +127,326 @@ fun RoutineScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier
-                        .background(
-                            color = RetrofitColors.Surface,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = RetrofitColors.onSurface
-                    )
-                }
+            RoutineScreenTopBar(onNavigateBack = onNavigateBack, onFilterClick = { showFilterDialog = true })
 
-                Text(
-                    text = "RUTINAS",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RetrofitColors.onSurface
-                )
+            Spacer(modifier = Modifier.height(16.dp))
 
-                IconButton(
-                    onClick = { showFilterDialog = true },
-                    modifier = Modifier
-                        .background(
-                            color = RetrofitColors.Primary.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FilterList,
-                        contentDescription = "Filtrar",
-                        tint = RetrofitColors.Primary
-                    )
-                }
-            }
+            RoutineScreenActions(
+                onNewRoutine = {
+                    onEvent(RoutineEvent.SelectRoutine(Routine()))
+                    showCreateDialog = true
+                },
+                onLoadActive = { onEvent(RoutineEvent.LoadActiveRoutines) }
+            )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = {
-                        onEvent(RoutineEvent.SelectRoutine(Routine()))
-                        showCreateDialog = true
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = RetrofitColors.Primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Nueva Rutina",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { onEvent(RoutineEvent.LoadActiveRoutines) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    border = BorderStroke(1.dp, RetrofitColors.Primary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "Solo Activas",
-                        color = RetrofitColors.Primary,
-                        fontSize = 14.sp
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (state.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = RetrofitColors.Primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
+                LoadingIndicator()
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(state.routines) { routine ->
-                        RoutineCard(
-                            routine = routine,
-                            onToggleActive = { onEvent(RoutineEvent.ToggleRoutineActive(routine.routineId)) },
-                            onComplete = { onEvent(RoutineEvent.IncrementTimesCompleted(routine.routineId)) },
-                            onSelect = { onEvent(RoutineEvent.ViewRoutine(routine)) }
-                        )
-                    }
-                }
+                RoutineList(
+                    routines = state.routines,
+                    onToggleActive = { routineId -> onEvent(RoutineEvent.ToggleRoutineActive(routineId)) },
+                    onComplete = { routineId -> onEvent(RoutineEvent.IncrementTimesCompleted(routineId)) },
+                    onSelect = { routine -> onEvent(RoutineEvent.ViewRoutine(routine)) }
+                )
             }
         }
 
-        state.successMessage?.let { message ->
-            Card(
+        // Success and error messages
+        state.successMessage?.let { SuccessMessage(message = it) }
+        state.errorMessage?.let { ErrorMessage(message = it, onClose = { onEvent(RoutineEvent.ClearMessages) }) }
+
+        if (showCreateDialog) {
+            CreateRoutineDialog(
+                state = state,
+                onEvent = onEvent,
+                onDismiss = {
+                    showCreateDialog = false
+                    onEvent(RoutineEvent.HideExerciseSelection)
+                }
+            )
+        }
+
+        if (showFilterDialog) {
+            FilterDialogContent(
+                onDismiss = { showFilterDialog = false },
+                onFilterByDifficulty = { difficulty ->
+                    onEvent(RoutineEvent.LoadRoutinesByDifficulty(difficulty))
+                    showFilterDialog = false
+                },
+                onFilterByMuscleGroup = { muscleGroup ->
+                    onEvent(RoutineEvent.LoadRoutinesByMuscleGroups(muscleGroup))
+                    showFilterDialog = false
+                },
+                onShowAll = {
+                    onEvent(RoutineEvent.LoadAllRoutines)
+                    showFilterDialog = false
+                }
+            )
+        }
+
+        if (state.showRoutineDetails && state.routineToView != null) {
+            RoutineDetailsDialogContent(
+                routine = state.routineToView,
+                routineExercises = state.selectedExercises,
+                getExerciseDetails = { exerciseId ->
+                    state.routineExercises.find { it.exerciseId == exerciseId }
+                },
+                onEdit = {
+                    onEvent(RoutineEvent.SelectRoutine(state.routineToView!!))
+                    onEvent(RoutineEvent.ClearMessages)
+                    showCreateDialog = true
+                },
+                onDismiss = { onEvent(RoutineEvent.ClearMessages) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutineScreenTopBar(
+    onNavigateBack: () -> Unit,
+    onFilterClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onNavigateBack,
+            modifier = Modifier
+                .background(
+                    color = RetrofitColors.Surface,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Volver",
+                tint = RetrofitColors.onSurface
+            )
+        }
+
+        Text(
+            text = "RUTINAS",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = RetrofitColors.onSurface
+        )
+
+        IconButton(
+            onClick = onFilterClick,
+            modifier = Modifier
+                .background(
+                    color = RetrofitColors.Primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.FilterList,
+                contentDescription = "Filtrar",
+                tint = RetrofitColors.Primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutineScreenActions(
+    onNewRoutine: () -> Unit,
+    onLoadActive: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(
+            onClick = onNewRoutine,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = RetrofitColors.Primary),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Nueva Rutina",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        OutlinedButton(
+            onClick = onLoadActive,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            border = BorderStroke(1.dp, RetrofitColors.Primary),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = "Solo Activas",
+                color = RetrofitColors.Primary,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoadingIndicator() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            color = RetrofitColors.Primary,
+            modifier = Modifier.size(48.dp)
+        )
+    }
+}
+
+@Composable
+private fun RoutineList(
+    routines: List<Routine>,
+    onToggleActive: (Int) -> Unit,
+    onComplete: (Int) -> Unit,
+    onSelect: (Routine) -> Unit
+) {
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        items(routines) { routine ->
+            RoutineCard(
+                routine = routine,
+                onToggleActive = { onToggleActive(routine.routineId) },
+                onComplete = { onComplete(routine.routineId) },
+                onSelect = { onSelect(routine) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuccessMessage(message: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Green.copy(alpha = 0.9f)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = message,
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(16.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun ErrorMessage(message: String, onClose: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Red.copy(alpha = 0.9f)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Green.copy(alpha = 0.9f)
-                ),
-                shape = RoundedCornerShape(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = message,
                     color = Color.White,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(16.dp),
-                    textAlign = TextAlign.Center
+                    modifier = Modifier.weight(1f)
                 )
-            }
-        }
-
-        state.errorMessage?.let { message ->
-            Card(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.Red.copy(alpha = 0.9f)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = message,
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        modifier = Modifier.weight(1f)
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
-                    IconButton(
-                        onClick = { onEvent(RoutineEvent.ClearMessages) }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Cerrar",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                 }
             }
         }
     }
+}
 
-    if (showCreateDialog) {
-        RoutineWizardDialog(
-            state = state,
-            onEvent = onEvent,
-            onDismiss = {
-                showCreateDialog = false
-                onEvent(RoutineEvent.HideExerciseSelection)
-            }
-        )
-    }
 
-    if (showFilterDialog) {
-        FilterDialog(
-            onDismiss = { showFilterDialog = false },
-            onFilterByDifficulty = { difficulty ->
-                onEvent(RoutineEvent.LoadRoutinesByDifficulty(difficulty))
-                showFilterDialog = false
-            },
-            onFilterByMuscleGroup = { muscleGroup ->
-                onEvent(RoutineEvent.LoadRoutinesByMuscleGroups(muscleGroup))
-                showFilterDialog = false
-            },
-            onShowAll = {
-                onEvent(RoutineEvent.LoadAllRoutines)
-                showFilterDialog = false
-            }
-        )
-    }
+// Dialogs (assuming these composables exist with same signatures)
+@Composable
+private fun CreateRoutineDialog(
+    state: RoutineUiState,
+    onEvent: (RoutineEvent) -> Unit,
+    onDismiss: () -> Unit
+) {
+    RoutineWizardDialog(state = state, onEvent = onEvent, onDismiss = onDismiss)
+}
 
-    if (state.showRoutineDetails && state.routineToView != null) {
-        RoutineDetailsDialog(
-            routine = state.routineToView,
-            routineExercises = state.selectedExercises,
-            getExerciseDetails = { exerciseId ->
-                state.routineExercises.find { it.exerciseId == exerciseId }
-            },
-            onEdit = {
-                onEvent(RoutineEvent.SelectRoutine(state.routineToView!!))
-                onEvent(RoutineEvent.ClearMessages)
-                showCreateDialog = true
-            },
-            onDismiss = {
-                onEvent(RoutineEvent.ClearMessages)
-            }
-        )
-    }
+@Composable
+private fun FilterDialogContent(
+    onDismiss: () -> Unit,
+    onFilterByDifficulty: (String) -> Unit,
+    onFilterByMuscleGroup: (String) -> Unit,
+    onShowAll: () -> Unit
+) {
+    FilterDialog(
+        onDismiss = onDismiss,
+        onFilterByDifficulty = onFilterByDifficulty,
+        onFilterByMuscleGroup = onFilterByMuscleGroup,
+        onShowAll = onShowAll
+    )
+}
+
+@Composable
+private fun RoutineDetailsDialogContent(
+    routine: Routine,
+    routineExercises: List<Exercise>,
+    getExerciseDetails: (Int) -> RoutineExercise?,
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    RoutineDetailsDialog(
+        routine = routine,
+        routineExercises = routineExercises,
+        getExerciseDetails = getExerciseDetails,
+        onEdit = onEdit,
+        onDismiss = onDismiss
+    )
 }
 @Composable
 fun RoutineDetailsDialog(
