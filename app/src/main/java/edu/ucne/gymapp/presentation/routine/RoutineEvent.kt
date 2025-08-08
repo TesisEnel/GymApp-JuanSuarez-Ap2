@@ -3,7 +3,7 @@ package edu.ucne.gymapp.presentation.routine
 import edu.ucne.gymapp.data.local.entities.Exercise
 import edu.ucne.gymapp.data.local.entities.MuscleGroup
 import edu.ucne.gymapp.data.local.entities.Routine
-import edu.ucne.gymapp.data.local.entities.RoutineExercise
+
 
 sealed class RoutineEvent {
     data class NameChange(val name: String) : RoutineEvent()

@@ -3,6 +3,11 @@ import edu.ucne.gymapp.data.local.entities.Exercise
 
 object PredefinedExercises {
 
+    private const val EQUIP_BANDA_ELASTICA = "Banda elástica"
+    private const val EQUIP_BARRA_DISCOS = "Barra, Discos"
+    private const val EQUIP_OPCIONAL_MANCUERNAS = "Opcional: mancuernas"
+    private const val EQUIP_RESISTENCIA_MANUAL = "Resistencia manual"
+
     fun getAll(): List<Exercise> = listOf(
         Exercise(
             exerciseId = 1,
@@ -72,7 +77,7 @@ object PredefinedExercises {
             instructions = "Inclínate hacia adelante, mantén la espalda recta y tira de la barra hacia el abdomen",
             muscleGroupId = 2,
             difficulty = "Intermedio",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -102,7 +107,7 @@ object PredefinedExercises {
             instructions = "Levanta la barra desde el suelo manteniendo la espalda recta, empuja con las caderas",
             muscleGroupId = 2,
             difficulty = "Avanzado",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -112,7 +117,7 @@ object PredefinedExercises {
             instructions = "De pie, empuja la barra desde los hombros hacia arriba, mantén el core activado",
             muscleGroupId = 3,
             difficulty = "Intermedio",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -173,7 +178,7 @@ object PredefinedExercises {
             instructions = "De pie, curl la barra desde extensión completa hasta contracción máxima",
             muscleGroupId = 4,
             difficulty = "Principiante",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -364,7 +369,7 @@ object PredefinedExercises {
             instructions = "Coloca la barra en los trapecios, baja controladamente y empuja con los talones para subir",
             muscleGroupId = 8,
             difficulty = "Intermedio",
-            equipment = "Barra, Discos, Rack",
+            equipment = "$EQUIP_BARRA_DISCOS, Rack",
             popularity = 0
         ),
         Exercise(
@@ -384,7 +389,7 @@ object PredefinedExercises {
             instructions = "Da un paso hacia adelante y baja hasta que ambas rodillas estén a 90°",
             muscleGroupId = 8,
             difficulty = "Principiante",
-            equipment = "Opcional: mancuernas",
+            equipment = EQUIP_OPCIONAL_MANCUERNAS,
             popularity = 0
         ),
         Exercise(
@@ -404,7 +409,7 @@ object PredefinedExercises {
             instructions = "Mantén las piernas semiflexionadas, baja la barra empujando las caderas hacia atrás",
             muscleGroupId = 9,
             difficulty = "Intermedio",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -424,7 +429,7 @@ object PredefinedExercises {
             instructions = "Piernas casi rectas, baja la barra empujando las caderas hacia atrás",
             muscleGroupId = 9,
             difficulty = "Intermedio",
-            equipment = "Barra, discos",
+            equipment = "$EQUIP_BARRA_DISCOS",
             popularity = 0
         ),
         Exercise(
@@ -444,7 +449,7 @@ object PredefinedExercises {
             instructions = "Barra en los hombros, inclínate hacia adelante desde las caderas",
             muscleGroupId = 9,
             difficulty = "Intermedio",
-            equipment = "Barra, discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -474,7 +479,7 @@ object PredefinedExercises {
             instructions = "Con banda en las piernas, camina lateralmente manteniendo tensión",
             muscleGroupId = 10,
             difficulty = "Principiante",
-            equipment = "Banda elástica",
+            equipment = EQUIP_BANDA_ELASTICA,
             popularity = 0
         ),
         Exercise(
@@ -504,7 +509,7 @@ object PredefinedExercises {
             instructions = "De pie, elévate sobre las puntas de los pies y baja controladamente",
             muscleGroupId = 11,
             difficulty = "Principiante",
-            equipment = "Opcional: mancuernas",
+            equipment = EQUIP_OPCIONAL_MANCUERNAS,
             popularity = 0
         ),
         Exercise(
@@ -564,7 +569,7 @@ object PredefinedExercises {
             instructions = "Da un paso lateral amplio, baja y regresa al centro",
             muscleGroupId = 12,
             difficulty = "Principiante",
-            equipment = "Opcional: mancuernas",
+            equipment = EQUIP_OPCIONAL_MANCUERNAS,
             popularity = 0
         ),
         Exercise(
@@ -604,7 +609,7 @@ object PredefinedExercises {
             instructions = "Acostado de lado, abre y cierra las rodillas como una almeja",
             muscleGroupId = 13,
             difficulty = "Principiante",
-            equipment = "Opcional: banda elástica",
+            equipment = "Opcional: $EQUIP_BANDA_ELASTICA",
             popularity = 0
         ),
         Exercise(
@@ -614,7 +619,7 @@ object PredefinedExercises {
             instructions = "Con banda en tobillos, da pasos laterales manteniendo tensión",
             muscleGroupId = 13,
             difficulty = "Principiante",
-            equipment = "Banda elástica",
+            equipment = EQUIP_BANDA_ELASTICA,
             popularity = 0
         ),
         Exercise(
@@ -624,7 +629,7 @@ object PredefinedExercises {
             instructions = "Con resistencia manual o peso, flexiona el cuello hacia adelante",
             muscleGroupId = 14,
             difficulty = "Principiante",
-            equipment = "Resistencia manual o disco",
+            equipment = "$EQUIP_RESISTENCIA_MANUAL o disco",
             popularity = 0
         ),
         Exercise(
@@ -634,7 +639,7 @@ object PredefinedExercises {
             instructions = "Con resistencia, extiende el cuello hacia atrás controladamente",
             muscleGroupId = 14,
             difficulty = "Principiante",
-            equipment = "Resistencia manual",
+            equipment = EQUIP_RESISTENCIA_MANUAL,
             popularity = 0
         ),
         Exercise(
@@ -644,7 +649,7 @@ object PredefinedExercises {
             instructions = "Rota el cuello contra resistencia en ambas direcciones",
             muscleGroupId = 14,
             difficulty = "Principiante",
-            equipment = "Resistencia manual",
+            equipment = EQUIP_RESISTENCIA_MANUAL,
             popularity = 0
         ),
         Exercise(
@@ -654,7 +659,7 @@ object PredefinedExercises {
             instructions = "Inclina la cabeza hacia el lado contra resistencia",
             muscleGroupId = 14,
             difficulty = "Principiante",
-            equipment = "Resistencia manual",
+            equipment = EQUIP_RESISTENCIA_MANUAL,
             popularity = 0
         ),
         Exercise(
@@ -704,7 +709,7 @@ object PredefinedExercises {
             instructions = "De pie, tira de la barra hacia el cuello con los codos elevados",
             muscleGroupId = 16,
             difficulty = "Intermedio",
-            equipment = "Barra, Discos",
+            equipment = EQUIP_BARRA_DISCOS,
             popularity = 0
         ),
         Exercise(
@@ -744,7 +749,7 @@ object PredefinedExercises {
             instructions = "Pisa la banda y rema hacia el pecho manteniendo codos altos",
             muscleGroupId = 17,
             difficulty = "Principiante",
-            equipment = "Banda elástica",
+            equipment = EQUIP_BANDA_ELASTICA,
             popularity = 0
         ),
         Exercise(
@@ -784,7 +789,7 @@ object PredefinedExercises {
             instructions = "Pisa la banda, colócala en los hombros e inclínate manteniendo la espalda recta",
             muscleGroupId = 18,
             difficulty = "Principiante",
-            equipment = "Banda elástica",
+            equipment = EQUIP_BANDA_ELASTICA,
             popularity = 0
         ),
         Exercise(
@@ -806,6 +811,6 @@ object PredefinedExercises {
             difficulty = "Principiante",
             equipment = null,
             popularity = 0
-        ),
+        )
     )
 }
