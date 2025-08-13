@@ -128,10 +128,6 @@ fun AppNavHost(
                 onNavigateBack = {
                     navController.navigateUp()
                 },
-                onNavigateToExerciseSet = {
-                    navController.navigate(Screen.ExerciseSet)
-                },
-                viewModel = exerciseViewModel,
                 muscleGroupId = args.muscleGroupId
             )
         }
