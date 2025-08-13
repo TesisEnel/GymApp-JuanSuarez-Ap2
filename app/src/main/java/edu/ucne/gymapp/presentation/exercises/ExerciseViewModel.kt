@@ -235,13 +235,16 @@ class ExerciseViewModel @Inject constructor(
                 exerciseRepository.incrementExercisePopularity(exerciseId).collect { result ->
                     when (result) {
                         is Resource.Loading -> {
+                            _state.update { it.copy(isLoading = true) }
                         }
                         is Resource.Success -> {
+                            _state.update { it.copy(isLoading = false) }
                             loadAllExercises()
                         }
                         is Resource.Error -> {
                             _state.update {
                                 it.copy(
+                                    isLoading = false,
                                     errorMessage = result.message ?: "Error al actualizar popularidad"
                                 )
                             }
