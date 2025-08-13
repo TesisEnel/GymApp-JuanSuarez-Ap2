@@ -117,7 +117,7 @@ class ExerciseRepository @Inject constructor(
 
 
             if (!allExercises.isEmpty()) {
-                allExercises.forEachIndexed { index, ejercicio ->
+                allExercises.forEach { ejercicio ->
                 }
             }
 
