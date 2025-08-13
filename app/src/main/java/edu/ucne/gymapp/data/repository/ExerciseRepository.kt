@@ -48,7 +48,7 @@ class ExerciseRepository @Inject constructor(
         try {
             emit(Resource.Loading())
 
-            exercises.forEachIndexed { index, exercise ->
+            exercises.forEach { exercise ->
                 try {
                     exerciseDao.insertExercise(exercise)
                 } catch (e: Exception) {
