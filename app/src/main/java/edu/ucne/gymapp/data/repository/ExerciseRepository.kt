@@ -1,5 +1,6 @@
 package edu.ucne.gymapp.data.repository
 
+import android.util.Log
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.dao.ExerciseDao
 import edu.ucne.gymapp.presentation.exercises.PredefinedExercises
@@ -23,7 +24,7 @@ class ExerciseRepository @Inject constructor(
             emit(Resource.Error(e.message ?: "Este ejercicio no quiso entrar al sistema. Tal vez necesita calentar primero."))
         }
     }.flowOn(Dispatchers.IO)
-    suspend fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
+    fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
         try {
             emit(Resource.Loading())
             val exercises = exerciseDao.getExercisesByIds(exerciseIds)
@@ -47,9 +48,9 @@ class ExerciseRepository @Inject constructor(
         try {
             emit(Resource.Loading())
 
-            exercises.forEachIndexed { index, exercise ->
+            exercises.forEach { exercise ->
                 try {
-                    val exerciseId = exerciseDao.insertExercise(exercise)
+                    exerciseDao.insertExercise(exercise)
                 } catch (e: Exception) {
                     throw e
                 }
@@ -107,7 +108,7 @@ class ExerciseRepository @Inject constructor(
                     try {
                         val insertedId = exerciseDao.insertExercise(exercise)
                         dbExercises.add(exercise.copy(exerciseId = insertedId.toInt()))
-                    } catch (e: Exception) {
+                    } catch (e: Exception) { Log.e("EjercicioRepository", "Error al poner el ejercicio: ${e.message} quiza esta en volumen..", e)
                     }
                 }
             }
@@ -115,9 +116,8 @@ class ExerciseRepository @Inject constructor(
             val allExercises = dbExercises.sortedBy { it.exerciseId }
 
 
-            if (allExercises.isEmpty()) {
-            } else {
-                allExercises.forEachIndexed { index, exercise ->
+            if (!allExercises.isEmpty()) {
+                allExercises.forEach { ejercicio ->
                 }
             }
 

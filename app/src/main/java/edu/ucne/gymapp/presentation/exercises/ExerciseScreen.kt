@@ -48,8 +48,6 @@ fun ExerciseScreen(
     state: ExerciseUiState,
     onEvent: (ExerciseEvent) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToExerciseSet: () -> Unit,
-    viewModel: ExerciseViewModel,
     muscleGroupId: Int? = null
 ) {
     LaunchedEffect(muscleGroupId) {

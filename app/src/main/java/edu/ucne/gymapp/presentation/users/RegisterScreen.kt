@@ -364,7 +364,7 @@ fun RegisterScreen(
                     SimpleDateFormat(
                         "dd/MM/yyyy",
                         Locale.getDefault()
-                    ).format(Date(state.birthDate!!))
+                    ).format(Date(state.birthDate))
                 } else "",
                 onValueChange = { },
                 label = { Text("Fecha de nacimiento") },
