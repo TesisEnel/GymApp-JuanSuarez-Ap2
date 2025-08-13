@@ -49,7 +49,7 @@ class ExerciseRepository @Inject constructor(
 
             exercises.forEachIndexed { index, exercise ->
                 try {
-                    val exerciseId = exerciseDao.insertExercise(exercise)
+                    exerciseDao.insertExercise(exercise)
                 } catch (e: Exception) {
                     throw e
                 }
