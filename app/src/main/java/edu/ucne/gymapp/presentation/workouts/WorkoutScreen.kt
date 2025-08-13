@@ -502,7 +502,7 @@ fun WorkoutHeader(
                     .weight(1f)
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isPaused) RetrofitColors.Primary else Color.Yellow
+                    containerColor = if (isPaused) RetrofitColors.Primary else Color.DarkGray,
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
