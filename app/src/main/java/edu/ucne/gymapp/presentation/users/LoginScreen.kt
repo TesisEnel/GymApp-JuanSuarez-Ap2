@@ -49,14 +49,14 @@ import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
 
+
+
 @Composable
 fun LoginScreen(
     state: UserUiState,
     onEvent: (UserEvent) -> Unit,
     onNavigateToRegister: () -> Unit
 ){
-    var passwordVisible by remember { mutableStateOf(false) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -136,41 +136,10 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
+            PasswordTextField(
                 value = state.password,
                 onValueChange = { onEvent(UserEvent.PasswordChange(it)) },
-                label = { Text(text = "Contraseña") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Contraseña",
-                        tint = RetrofitColors.Gray
-                    )
-                },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña",
-                            tint = RetrofitColors.Gray
-                        )
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp)),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = RetrofitColors.Primary,
-                    unfocusedBorderColor = RetrofitColors.Gray,
-                    focusedLabelColor = RetrofitColors.Primary,
-                    unfocusedLabelColor = RetrofitColors.Gray,
-                    focusedTextColor = RetrofitColors.onSurface,
-                    unfocusedTextColor = RetrofitColors.onSurface,
-                    cursorColor = RetrofitColors.Primary,
-                    focusedLeadingIconColor = RetrofitColors.Primary,
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -260,5 +229,63 @@ fun LoginScreen(
             }
         }
     }
+}
+
+@Composable
+private fun PasswordTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        label = { Text("Contraseña") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+
+        // --- ICONO DE LA IZQUIERDA (NUEVO) ---
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Lock, // Ícono de candado
+                contentDescription = "Icono de Contraseña"
+            )
+        },
+
+        // --- ICONO DE LA DERECHA (VISIBILIDAD) ---
+        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            val image = if (passwordVisible)
+                Icons.Default.Visibility
+            else
+                Icons.Default.VisibilityOff
+
+            val description = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+
+            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                Icon(imageVector = image, contentDescription = description)
+            }
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            cursorColor = Color.White,
+
+            focusedBorderColor = Color.White,
+            unfocusedBorderColor = Color.Gray,
+
+            focusedLabelColor = Color.White,
+            unfocusedLabelColor = Color.Gray,
+
+            focusedLeadingIconColor = Color.White,
+            unfocusedLeadingIconColor = Color.Gray,
+            focusedTrailingIconColor = Color.White,
+            unfocusedTrailingIconColor = Color.Gray
+        )
+    )
 }
 
