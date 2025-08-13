@@ -1,5 +1,6 @@
 package edu.ucne.gymapp.data.repository
 
+import android.util.Log
 import edu.ucne.gymapp.data.local.Resource
 import edu.ucne.gymapp.data.local.dao.ExerciseDao
 import edu.ucne.gymapp.presentation.exercises.PredefinedExercises
@@ -107,7 +108,7 @@ class ExerciseRepository @Inject constructor(
                     try {
                         val insertedId = exerciseDao.insertExercise(exercise)
                         dbExercises.add(exercise.copy(exerciseId = insertedId.toInt()))
-                    } catch (e: Exception) {
+                    } catch (e: Exception) { Log.e("EjercicioRepository", "Error al poner el ejercicio: ${e.message} quiza esta en volumen..", e)
                     }
                 }
             }
@@ -115,9 +116,8 @@ class ExerciseRepository @Inject constructor(
             val allExercises = dbExercises.sortedBy { it.exerciseId }
 
 
-            if (allExercises.isEmpty()) {
-            } else {
-                allExercises.forEachIndexed { index, exercise ->
+            if (!allExercises.isEmpty()) {
+                allExercises.forEachIndexed { index, ejercicio ->
                 }
             }
 
