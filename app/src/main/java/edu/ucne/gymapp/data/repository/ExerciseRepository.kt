@@ -23,7 +23,7 @@ class ExerciseRepository @Inject constructor(
             emit(Resource.Error(e.message ?: "Este ejercicio no quiso entrar al sistema. Tal vez necesita calentar primero."))
         }
     }.flowOn(Dispatchers.IO)
-    suspend fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
+    fun getExercisesByIds(exerciseIds: List<Int>): Flow<Resource<List<Exercise>>> = flow {
         try {
             emit(Resource.Loading())
             val exercises = exerciseDao.getExercisesByIds(exerciseIds)
